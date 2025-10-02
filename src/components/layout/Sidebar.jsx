@@ -136,7 +136,7 @@ const Sidebar = ({
                       onClick={onClose} // Close mobile sidebar on navigation
                       title={isCollapsed ? item.name : undefined}
                       className={cn(
-                        "flex items-center rounded-lg text-sm font-medium transition-colors",
+                        "flex items-center rounded-lg text-sm font-medium transition-colors text-nowrap",
                         isCollapsed
                           ? "justify-center px-3 py-3"
                           : "space-x-3 px-3 py-2",
@@ -156,8 +156,8 @@ const Sidebar = ({
         </div>
       </nav>
 
-      {/* User section - Always visible */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-1">
+      {/* User section - Solo visible en móvil */}
+      <div className="lg:hidden p-4 border-t border-gray-200 dark:border-gray-700 space-y-1">
         <Link
           to="/profile"
           onClick={onClose}

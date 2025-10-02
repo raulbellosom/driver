@@ -147,9 +147,14 @@ const Navbar = ({ sidebarOpen, setSidebarOpen }) => {
                   </div>
                 )}
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-                  {(user?.name || "Usuario").length > 10
-                    ? `${(user?.name || "Usuario").substring(0, 10)}...`
-                    : user?.name || "Usuario"}
+                  <span className="hidden sm:inline">
+                    {user?.name || "Usuario"}
+                  </span>
+                  <span className="sm:hidden">
+                    {(user?.name || "Usuario").length > 10
+                      ? `${(user?.name || "Usuario").substring(0, 10)}...`
+                      : user?.name || "Usuario"}
+                  </span>
                 </span>
               </Button>
 
