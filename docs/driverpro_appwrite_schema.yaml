@@ -1,0 +1,259 @@
+schema_version: '1.0'
+provider: appwrite
+generated_at: '2025-10-01T15:27:40.127691Z'
+notes:
+- 'Boolean defaults + required: Appwrite UI actualmente no permite default si el atributo
+  es required; manejar default en Functions o en el cliente.'
+- Appwrite no permite índices sobre campos de tipo Relationship; documentados aquí
+  como 'not_supported_by_appwrite' cuando aplique.
+users:
+  description: Colección del sistema Appwrite Auth (no en la base de datos).
+  fields:
+  - name: $id
+    type: string
+    system: true
+  - name: email
+    type: email
+    system: true
+  - name: phone
+    type: string
+    system: true
+  - name: name
+    type: string
+    system: true
+  - name: status
+    type: integer
+    system: true
+  - name: passwordUpdate
+    type: datetime
+    system: true
+  - name: registration
+    type: datetime
+    system: true
+database:
+  collections:
+  - key: companies
+    name: Companies
+    attributes:
+    - name: name
+      type: string
+      required: true
+    - name: rfc
+      type: string
+      required: false
+    - name: address
+      type: string
+      required: false
+    - name: contactName
+      type: string
+      required: false
+    - name: contactEmail
+      type: email
+      required: false
+    - name: contactPhone
+      type: string
+      required: false
+    - name: enabled
+      type: boolean
+      required: true
+      default_supported: false
+    - name: usersProfile
+      type: relationship
+      required: false
+      relationship:
+        target: usersProfile
+        cardinality: oneToMany
+        owning_side: false
+        inverse_of: companies
+        on_delete: cascade
+    indexes:
+    - name: idx_companies_rfc
+      type: unique
+      fields:
+      - rfc
+    - name: idx_companies_name
+      type: fulltext
+      fields:
+      - name
+      - address
+  - key: usersProfile
+    name: usersProfile
+    attributes:
+    - name: userId
+      type: string
+      required: true
+    - name: displayName
+      type: string
+      required: false
+    - name: avatarUrl
+      type: url
+      required: false
+    - name: companies
+      type: relationship
+      required: false
+      relationship:
+        target: companies
+        cardinality: manyToOne
+        owning_side: true
+        inverse_of: usersProfile
+        on_delete: setNull
+    - name: isDriver
+      type: boolean
+      required: true
+      default_supported: false
+    - name: licenseNumber
+      type: string
+      required: false
+    - name: licenseExpiry
+      type: datetime
+      required: false
+    - name: licenseClass
+      type: string
+      required: false
+    - name: enabled
+      type: boolean
+      required: true
+      default_supported: false
+    indexes:
+    - name: uniq_users_profile_userId
+      type: unique
+      fields:
+      - userId
+    - key: driver_licenses
+    name: driver_licenses
+    attributes:
+      - name: usersProfile
+        type: relationship
+        required: true
+        relationship:
+          target: usersProfile
+          cardinality: manyToOne
+          owning_side: true
+          inverse_of: null
+          on_delete: cascade
+      - name: frontFileUrl
+        type: url
+        required: false
+      - name: backFileUrl
+        type: url
+        required: false
+      - name: status
+        type: enum
+        required: true
+        values: [pending, approved, rejected]
+      - name: reviewedByUserId
+        type: string
+        required: false
+      - name: reviewNotes
+        type: string
+        required: false
+      - name: enabled
+        type: boolean
+        required: true
+        default_supported: false   # Appwrite UI no permite default si es required
+      - name: userId
+        type: string
+        required: true
+    indexes:
+      - name: idx_driver_licenses_userProfile
+        type: key
+        fields: [usersProfile]   # nota: Appwrite suele no indexar relationships; déjalo documentado
+      - name: idx_driver_licenses_userId
+        type: unique
+        fields: [userId]
+    notes:
+      - "Una licencia por usuario garantizada por el índice único en userId."
+      - "Si luego permites múltiples, cambia el índice a key y agrega un flag 'active'."
+  - key: vehicle_brands
+    name: vehicle_brands
+    attributes:
+    - name: name
+      type: string
+      required: true
+    - name: enabled
+      type: boolean
+      required: true
+      default_supported: false
+    - name: vehicleModels
+      type: relationship
+      required: false
+      relationship:
+        target: vehicle_models
+        cardinality: oneToMany
+        owning_side: false
+        inverse_of: brand
+        on_delete: restrict
+    indexes:
+    - name: uniq_vehicle_brands_name
+      type: unique
+      fields:
+      - name
+  - key: vehicle_types
+    name: vehicle_types
+    attributes:
+    - name: name
+      type: string
+      required: true
+    - name: description
+      type: string
+      required: false
+    - name: enabled
+      type: boolean
+      required: true
+      default_supported: false
+    - name: vehicleModels
+      type: relationship
+      required: false
+      relationship:
+        target: vehicle_models
+        cardinality: oneToMany
+        owning_side: false
+        inverse_of: type
+        on_delete: setNull
+    indexes:
+    - name: uniq_vehicle_types_name
+      type: unique
+      fields:
+      - name
+  - key: vehicle_models
+    name: vehicle_models
+    attributes:
+    - name: brand
+      type: relationship
+      required: false
+      relationship:
+        target: vehicle_brands
+        cardinality: manyToOne
+        owning_side: true
+        inverse_of: vehicleModels
+        on_delete: restrict
+    - name: type
+      type: relationship
+      required: false
+      relationship:
+        target: vehicle_types
+        cardinality: manyToOne
+        owning_side: true
+        inverse_of: vehicleModels
+        on_delete: setNull
+    - name: name
+      type: string
+      required: true
+    - name: year
+      type: integer
+      required: false
+      constraints:
+        min: 1900
+        max: 2100
+    - name: enabled
+      type: boolean
+      required: true
+      default_supported: false
+    indexes:
+    - name: uniq_vehicle_models_brand_name_year
+      type: unique
+      fields:
+      - name
+    index_notes:
+    - En Appwrite no se pueden indexar relationships; ideal sería un índice compuesto
+      [brand, name, year].

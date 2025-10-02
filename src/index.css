@@ -1,0 +1,183 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* DriverPro Custom Variables */
+:root {
+  /* Primary Colors (DriverPro Blue) */
+  --dp-primary-50: #eff6ff;
+  --dp-primary-100: #dbeafe;
+  --dp-primary-200: #bfdbfe;
+  --dp-primary-300: #93c5fd;
+  --dp-primary-400: #60a5fa;
+  --dp-primary-500: #3b82f6;
+  --dp-primary-600: #2563eb;
+  --dp-primary-700: #1d4ed8;
+  --dp-primary-800: #1e40af;
+  --dp-primary-900: #1e3a8a;
+
+  /* Success (Green) */
+  --dp-success-50: #ecfdf5;
+  --dp-success-100: #d1fae5;
+  --dp-success-500: #10b981;
+  --dp-success-600: #059669;
+  --dp-success-700: #047857;
+
+  /* Warning (Amber) */
+  --dp-warning-50: #fffbeb;
+  --dp-warning-100: #fef3c7;
+  --dp-warning-500: #f59e0b;
+  --dp-warning-600: #d97706;
+  --dp-warning-700: #b45309;
+
+  /* Danger (Red) */
+  --dp-danger-50: #fef2f2;
+  --dp-danger-100: #fee2e2;
+  --dp-danger-500: #ef4444;
+  --dp-danger-600: #dc2626;
+  --dp-danger-700: #b91c1c;
+
+  /* Neutrals */
+  --dp-gray-50: #f9fafb;
+  --dp-gray-100: #f3f4f6;
+  --dp-gray-200: #e5e7eb;
+  --dp-gray-300: #d1d5db;
+  --dp-gray-400: #9ca3af;
+  --dp-gray-500: #6b7280;
+  --dp-gray-600: #4b5563;
+  --dp-gray-700: #374151;
+  --dp-gray-800: #1f2937;
+  --dp-gray-900: #111827;
+
+  /* Light Theme */
+  --dp-bg-primary: #ffffff;
+  --dp-bg-secondary: #f9fafb;
+  --dp-bg-tertiary: #f3f4f6;
+  --dp-text-primary: #111827;
+  --dp-text-secondary: #6b7280;
+  --dp-border: #e5e7eb;
+  --dp-border-light: #f3f4f6;
+}
+
+/* Dark Theme */
+.dark {
+  --dp-bg-primary: #111827;
+  --dp-bg-secondary: #1f2937;
+  --dp-bg-tertiary: #374151;
+  --dp-text-primary: #f9fafb;
+  --dp-text-secondary: #d1d5db;
+  --dp-border: #374151;
+  --dp-border-light: #4b5563;
+}
+
+/* Base Styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: var(--dp-bg-primary);
+  color: var(--dp-text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--dp-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--dp-gray-400);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dp-gray-500);
+}
+
+/* Focus Styles */
+:focus-visible {
+  outline: 2px solid var(--dp-primary-500);
+  outline-offset: 2px;
+}
+
+/* Animation Classes */
+.fade-in {
+  animation: fadeIn 0.2s ease-in;
+}
+
+.slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Print Styles */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+
+  /* Ensure touch targets are at least 44px */
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+}
