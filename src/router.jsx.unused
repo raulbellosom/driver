@@ -18,7 +18,6 @@ import DriverDashboard from "./pages/driver/Dashboard";
 
 // Legacy pages (TODO: Migrar o eliminar)
 import Home from "./pages/Home";
-import TestAPI from "./pages/TestAPI";
 import RealtimeDemo from "./pages/RealtimeDemo";
 import InputExamples from "./pages/InputExamples";
 
@@ -90,10 +89,6 @@ export const router = createBrowserRouter([
   {
     path: "/home",
     element: <Home />,
-  },
-  {
-    path: "/test-api",
-    element: <TestAPI />,
   },
   {
     path: "/realtime-demo",

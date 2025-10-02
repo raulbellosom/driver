@@ -95,7 +95,7 @@ const NotFound = () => {
               to="/driver"
               className="block text-sm text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
             >
-              Panel de Conductor
+              Inicio
             </Link>
             <Link
               to="/profile"

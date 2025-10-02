@@ -8,6 +8,7 @@ import AppLayout from "./components/layout/AppLayout";
 import Login from "./pages/shared/Login";
 import Register from "./pages/shared/Register";
 import Profile from "./pages/shared/Profile";
+import SecuritySettings from "./pages/shared/SecuritySettings";
 import NotFound from "./pages/shared/NotFound";
 
 // Admin Pages
@@ -70,6 +71,9 @@ export default function App() {
 
         {/* Perfil (accesible por todos los usuarios autenticados) */}
         <Route path="profile" element={<Profile />} />
+
+        {/* Configuración de Seguridad (accesible por todos los usuarios autenticados) */}
+        <Route path="security" element={<SecuritySettings />} />
 
         {/* Rutas de Admin */}
         <Route

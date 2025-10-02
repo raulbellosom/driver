@@ -39,7 +39,7 @@ const Navbar = ({ sidebarOpen, setSidebarOpen }) => {
       return "Administración";
     }
     if (path.startsWith("/driver")) {
-      if (path === "/driver") return "Panel de Conductor";
+      if (path === "/driver") return "Inicio";
       if (path === "/driver/trips") return "Mis Viajes";
       if (path === "/driver/search") return "Buscar Viaje";
       if (path === "/driver/vehicle") return "Mi Vehículo";
@@ -146,8 +146,10 @@ const Navbar = ({ sidebarOpen, setSidebarOpen }) => {
                     {user?.name?.charAt(0) || "U"}
                   </div>
                 )}
-                <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {user?.name || "Usuario"}
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                  {(user?.name || "Usuario").length > 10
+                    ? `${(user?.name || "Usuario").substring(0, 10)}...`
+                    : user?.name || "Usuario"}
                 </span>
               </Button>
 
@@ -230,13 +232,6 @@ const Navbar = ({ sidebarOpen, setSidebarOpen }) => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Mobile page title */}
-      <div className="md:hidden px-4 pb-2">
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-          {getPageTitle()}
-        </h1>
       </div>
 
       {/* Click outside to close dropdowns */}

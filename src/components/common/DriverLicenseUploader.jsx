@@ -376,30 +376,7 @@ const DriverLicenseUploader = ({
           </AnimatePresence>
         </motion.div>
 
-        {/* Tips - Solo mostrar cuando no hay imagen */}
-        {!currentImage && !preview && (
-          <motion.div
-            className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                  Consejos para una mejor captura:
-                </h4>
-                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                  <li>• Asegúrate de que toda la licencia sea visible</li>
-                  <li>• Usa buena iluminación, evita sombras</li>
-                  <li>• Mantén la imagen nítida y sin desenfoque</li>
-                  <li>• Evita reflejos en la superficie de la licencia</li>
-                </ul>
-              </div>
-            </div>
-          </motion.div>
-        )}
+        {/* Tips eliminados - Ahora se muestran en el componente padre para evitar duplicación */}
       </div>
 
       {/* Image Viewer Modal */}

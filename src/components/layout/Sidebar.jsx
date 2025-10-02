@@ -12,10 +12,13 @@ import {
   Wrench,
   X,
   ChevronLeft,
+  LogOut,
+  Settings,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../../utils";
 import Button from "../common/Button";
+import { useAuth } from "../../hooks/useAuth";
 
 const Sidebar = ({
   isOpen,
@@ -25,6 +28,7 @@ const Sidebar = ({
   onToggleCollapse,
 }) => {
   const location = useLocation();
+  const { logout } = useAuth();
 
   // Definir navegación según el rol
   const getNavigationItems = () => {
@@ -151,6 +155,60 @@ const Sidebar = ({
           ))}
         </div>
       </nav>
+
+      {/* User section - Always visible */}
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-1">
+        <Link
+          to="/profile"
+          onClick={onClose}
+          title={isCollapsed ? "Mi Perfil" : undefined}
+          className={cn(
+            "flex items-center rounded-lg text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800",
+            isCollapsed ? "justify-center px-3 py-3" : "space-x-3 px-3 py-2",
+            location.pathname === "/profile"
+              ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400"
+              : "text-gray-700 dark:text-gray-300"
+          )}
+        >
+          <User className="h-5 w-5 flex-shrink-0" />
+          {!isCollapsed && <span>Mi Perfil</span>}
+        </Link>
+
+        <Link
+          to="/security"
+          onClick={onClose}
+          title={isCollapsed ? "Configuración" : undefined}
+          className={cn(
+            "flex items-center rounded-lg text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800",
+            isCollapsed ? "justify-center px-3 py-3" : "space-x-3 px-3 py-2",
+            location.pathname === "/security"
+              ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400"
+              : "text-gray-700 dark:text-gray-300"
+          )}
+        >
+          <Settings className="h-5 w-5 flex-shrink-0" />
+          {!isCollapsed && <span>Configuración</span>}
+        </Link>
+
+        <button
+          onClick={async () => {
+            try {
+              await logout();
+              onClose();
+            } catch (error) {
+              console.error("Error al cerrar sesión:", error);
+            }
+          }}
+          title={isCollapsed ? "Cerrar Sesión" : undefined}
+          className={cn(
+            "w-full flex items-center rounded-lg text-sm font-medium transition-colors hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400",
+            isCollapsed ? "justify-center px-3 py-3" : "space-x-3 px-3 py-2"
+          )}
+        >
+          <LogOut className="h-5 w-5 flex-shrink-0" />
+          {!isCollapsed && <span>Cerrar Sesión</span>}
+        </button>
+      </div>
 
       {/* Collapse Toggle Button - Solo en Desktop */}
       <div className="hidden lg:block p-4 border-t border-gray-200 dark:border-gray-700">

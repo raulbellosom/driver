@@ -60,7 +60,7 @@ const Profile = () => {
 
     if (!isValid) {
       setPhoneError(
-        "Formato inválido. Usa +[código país][número] (ej: +523221358808)"
+        "Formato inválido. Usa +[código país][número] (ej: +523221234567)"
       );
       return false;
     }
@@ -386,8 +386,8 @@ const Profile = () => {
         )}
       </AnimatePresence>
 
-      {/* Header */}
-      <motion.div variants={itemVariants}>
+      {/* Header - Solo visible en desktop para evitar duplicación con Navbar en móvil */}
+      <motion.div variants={itemVariants} className="hidden sm:block">
         <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
           <div className="min-w-0 flex-1">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate">
@@ -445,7 +445,45 @@ const Profile = () => {
         <motion.div className="lg:col-span-2" variants={itemVariants}>
           <Card>
             <CardHeader>
-              <CardTitle>Información Personal</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Información Personal</CardTitle>
+
+                {/* Botones de acción para móvil */}
+                <div className="flex items-center gap-2 sm:hidden">
+                  {isEditing ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={handleCancel}
+                        disabled={isLoading}
+                        size="sm"
+                        className="h-8"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        onClick={handleSave}
+                        loading={isLoading}
+                        disabled={isLoading}
+                        size="sm"
+                        className="h-8"
+                      >
+                        <Save className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    isAdmin && (
+                      <Button
+                        onClick={() => setIsEditing(true)}
+                        size="sm"
+                        className="h-8"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    )
+                  )}
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Avatar Section */}
@@ -511,14 +549,14 @@ const Profile = () => {
                   onBlur={handlePhoneBlur}
                   disabled={!isEditing || (!isAdmin && isDriver)}
                   leftIcon={<Phone className="h-4 w-4" />}
-                  placeholder="+523221358808"
+                  placeholder="+523221234567"
                   error={phoneError}
                   hint={
                     phoneError
                       ? phoneError
                       : !isAdmin && isDriver
                       ? "Solo administradores pueden cambiar esto"
-                      : "Formato: +[código país][número] (ej: +523221358808)"
+                      : "Formato: +[código país][número] (ej: +523221234567)"
                   }
                 />
 
@@ -575,6 +613,55 @@ const Profile = () => {
                     <h5 className="text-md font-medium text-gray-900 dark:text-white">
                       Imágenes de Licencia de Conducir
                     </h5>
+
+                    {/* Consejos únicos - Solo mostrar cuando no hay imágenes */}
+                    {!driverLicense?.frontFileUrl &&
+                      !driverLicense?.backFileUrl && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex-shrink-0">
+                              <svg
+                                className="w-5 h-5 text-blue-600 dark:text-blue-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-3">
+                                Consejos para una mejor captura:
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                                  <li>
+                                    • Asegúrate de que toda la licencia sea
+                                    visible
+                                  </li>
+                                  <li>
+                                    • Usa buena iluminación, evita sombras
+                                  </li>
+                                </ul>
+                                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                                  <li>
+                                    • Mantén la imagen nítida y sin desenfoque
+                                  </li>
+                                  <li>
+                                    • Evita reflejos en la superficie de la
+                                    licencia
+                                  </li>
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Front License */}

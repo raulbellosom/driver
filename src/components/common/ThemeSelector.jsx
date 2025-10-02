@@ -21,21 +21,38 @@ const ThemeSelector = ({ className = "" }) => {
 
   return (
     <div className={`relative ${className}`}>
-      {/* Simple toggle button */}
+      {/* Enhanced theme toggle button with color */}
       <Button
         variant="ghost"
         size="sm"
         onClick={toggleTheme}
-        className="p-2 h-9 w-9"
+        className={`
+          p-2 h-9 w-9 transition-all duration-200 hover:scale-105
+          ${
+            theme === "light"
+              ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+              : theme === "dark"
+              ? "text-blue-400 hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+              : "text-purple-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+          }
+        `}
         title={`Tema actual: ${
           themes.find((t) => t.value === theme)?.label || "Claro"
-        }`}
+        }. Clic para cambiar`}
       >
-        <Icon className="h-4 w-4" />
+        <Icon
+          className={`
+          h-4 w-4 transition-transform duration-200
+          ${
+            theme === "light"
+              ? "rotate-0"
+              : theme === "dark"
+              ? "rotate-180"
+              : "rotate-90"
+          }
+        `}
+        />
       </Button>
-
-      {/* TODO: Implementar dropdown para selección específica */}
-      {/* Para ahora, solo el toggle simple que cicla entre los temas */}
     </div>
   );
 };

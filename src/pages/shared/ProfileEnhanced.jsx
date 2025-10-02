@@ -278,8 +278,8 @@ const Profile = () => {
         )}
       </AnimatePresence>
 
-      {/* Header */}
-      <motion.div variants={itemVariants}>
+      {/* Header - Solo visible en desktop para evitar duplicación con Navbar en móvil */}
+      <motion.div variants={itemVariants} className="hidden sm:block">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Mi Perfil</h1>
@@ -548,27 +548,78 @@ const Profile = () => {
                 </CardHeader>
                 <CardContent className="space-y-8">
                   {loadingLicense ? (
-                    <div className="text-center py-8">
-                      <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                      <p className="text-gray-600 dark:text-gray-300">
+                    <div className="flex flex-col items-center justify-center py-16">
+                      <div className="w-12 h-12 border-4 border-blue-500 dark:border-blue-400 border-t-transparent rounded-full animate-spin mb-4" />
+                      <p className="text-gray-600 dark:text-gray-300 text-center">
                         Cargando información de licencia...
                       </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <DriverLicenseUploader
-                        licenseType="front"
-                        currentImage={driverLicense?.front_image_url}
-                        onImageUploaded={handleLicenseUpload}
-                        onError={handleLicenseError}
-                      />
+                    <div className="space-y-6">
+                      {/* Consejos únicos - Solo mostrar cuando no hay imágenes */}
+                      {!driverLicense?.front_image_url &&
+                        !driverLicense?.back_image_url && (
+                          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex-shrink-0">
+                                <svg
+                                  className="w-5 h-5 text-blue-600 dark:text-blue-400"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-3">
+                                  Consejos para una mejor captura:
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                                  <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                                    <li>
+                                      • Asegúrate de que toda la licencia sea
+                                      visible
+                                    </li>
+                                    <li>
+                                      • Usa buena iluminación, evita sombras
+                                    </li>
+                                  </ul>
+                                  <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                                    <li>
+                                      • Mantén la imagen nítida y sin desenfoque
+                                    </li>
+                                    <li>
+                                      • Evita reflejos en la superficie de la
+                                      licencia
+                                    </li>
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
-                      <DriverLicenseUploader
-                        licenseType="back"
-                        currentImage={driverLicense?.back_image_url}
-                        onImageUploaded={handleLicenseUpload}
-                        onError={handleLicenseError}
-                      />
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <DriverLicenseUploader
+                          licenseType="front"
+                          currentImage={driverLicense?.front_image_url}
+                          onImageUploaded={handleLicenseUpload}
+                          onError={handleLicenseError}
+                        />
+
+                        <DriverLicenseUploader
+                          licenseType="back"
+                          currentImage={driverLicense?.back_image_url}
+                          onImageUploaded={handleLicenseUpload}
+                          onError={handleLicenseError}
+                        />
+                      </div>
                     </div>
                   )}
                 </CardContent>

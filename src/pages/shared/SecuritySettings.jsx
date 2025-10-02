@@ -211,12 +211,12 @@ const SecuritySettings = () => {
                   onChange={handleInputChange("currentPassword")}
                   error={errors.currentPassword}
                   placeholder="Ingresa tu contraseña actual"
-                  className="pr-10"
+                  className="pr-12"
                 />
                 <button
                   type="button"
                   onClick={() => togglePasswordVisibility("current")}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 z-10"
                 >
                   {showPasswords.current ? (
                     <EyeOff className="h-4 w-4" />
@@ -239,12 +239,12 @@ const SecuritySettings = () => {
                   onChange={handleInputChange("newPassword")}
                   error={errors.newPassword}
                   placeholder="Ingresa tu nueva contraseña"
-                  className="pr-10"
+                  className="pr-12"
                 />
                 <button
                   type="button"
                   onClick={() => togglePasswordVisibility("new")}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 z-10"
                 >
                   {showPasswords.new ? (
                     <EyeOff className="h-4 w-4" />
@@ -297,12 +297,12 @@ const SecuritySettings = () => {
                   onChange={handleInputChange("confirmPassword")}
                   error={errors.confirmPassword}
                   placeholder="Confirma tu nueva contraseña"
-                  className="pr-10"
+                  className="pr-12"
                 />
                 <button
                   type="button"
                   onClick={() => togglePasswordVisibility("confirm")}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 z-10"
                 >
                   {showPasswords.confirm ? (
                     <EyeOff className="h-4 w-4" />

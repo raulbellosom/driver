@@ -44,7 +44,15 @@ const AppLayout = () => {
       />
 
       {/* Main content */}
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div
+        className="flex flex-col flex-1 overflow-hidden"
+        onClick={() => {
+          // Cerrar sidebar en móvil si está abierto
+          if (sidebarOpen && window.innerWidth < 1024) {
+            setSidebarOpen(false);
+          }
+        }}
+      >
         {/* Navbar */}
         <Navbar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
