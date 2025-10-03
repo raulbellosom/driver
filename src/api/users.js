@@ -12,36 +12,41 @@ export const usersService = {
     try {
       // Intentar obtener usuarios reales de Appwrite
       try {
-        // Obtener usuarios de la colección de perfiles
+        // Obtener perfiles de la colección users_profile
         const profilesResponse = await db.listDocuments(
           env.DB_ID,
-          env.COLLECTION_USERS_PROFILE_ID, // Usar el ID correcto de la colección
+          env.COLLECTION_USERS_PROFILE_ID,
           []
         );
 
-        // Si tenemos perfiles reales, procesarlos
-        if (
-          profilesResponse.documents &&
-          profilesResponse.documents.length > 0
-        ) {
-          return profilesResponse.documents.map((profile) => ({
+        console.log("[USERS] Profile documents:", profilesResponse.total);
+
+        // Procesar los perfiles disponibles
+        const users = profilesResponse.documents.map((profile) => {
+          return {
             $id: profile.$id,
             userId: profile.userId,
             displayName: profile.displayName || profile.name || "Usuario",
             name: profile.name || "Sin nombre",
-            email: profile.email || "Sin email",
+            email: profile.email || "Sin email", // Del perfil por ahora
             phone: profile.phone || null,
             isDriver: profile.isDriver || false,
             enabled: profile.enabled ?? true,
             teams: profile.teams || [],
-            role: profile.isDriver ? "driver" : "admin", // Simplificado por ahora
+            role: profile.isDriver ? "driver" : "admin",
             createdAt: profile.createdAt || profile.$createdAt,
             updatedAt: profile.updatedAt || profile.$updatedAt,
-          }));
-        }
+            profileExists: true,
+            labels: [],
+            status: true,
+          };
+        });
+
+        console.log("[USERS] Processed users:", users.length);
+        return users;
       } catch (dbError) {
         console.warn(
-          "[USERS] No se pudo conectar a la base de datos real, usando datos vacíos:",
+          "[USERS] Error obteniendo usuarios reales:",
           dbError.message
         );
       }
