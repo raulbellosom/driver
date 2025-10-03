@@ -23,14 +23,7 @@ const AppLayout = () => {
   }, []);
 
   // Usar el hook de auth real
-  const { user, isAdmin, isDriver } = useAuth();
-
-  // Determinar el rol para el sidebar
-  const getUserRole = () => {
-    if (isAdmin) return "admin";
-    if (isDriver) return "driver";
-    return "user";
-  };
+  const { user } = useAuth();
 
   return (
     <div className="h-screen flex overflow-hidden bg-gray-50 dark:bg-gray-900">
@@ -40,7 +33,6 @@ const AppLayout = () => {
         onClose={() => setSidebarOpen(false)}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        userRole={getUserRole()}
       />
 
       {/* Main content */}

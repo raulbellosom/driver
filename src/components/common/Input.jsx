@@ -120,9 +120,10 @@ const Input = React.forwardRef(
                   : "h-4 w-4"
               )}
             >
-              {React.cloneElement(leftIcon, {
-                size: size === "sm" ? 14 : size === "lg" ? 20 : 16,
-              })}
+              {leftIcon &&
+                React.cloneElement(leftIcon, {
+                  size: size === "sm" ? 14 : size === "lg" ? 20 : 16,
+                })}
             </div>
           )}
 
@@ -156,9 +157,10 @@ const Input = React.forwardRef(
                   : "h-4 w-4"
               )}
             >
-              {React.cloneElement(rightIcon, {
-                size: size === "sm" ? 14 : size === "lg" ? 20 : 16,
-              })}
+              {rightIcon &&
+                React.cloneElement(rightIcon, {
+                  size: size === "sm" ? 14 : size === "lg" ? 20 : 16,
+                })}
             </div>
           )}
         </div>

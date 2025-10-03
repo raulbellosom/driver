@@ -18,8 +18,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
-import {
-  Card,
+import Card, {
   CardContent,
   CardHeader,
   CardTitle,

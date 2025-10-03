@@ -17,40 +17,64 @@ export function useRole() {
 
   const teamIds = (memberships || []).map((m) => m.teamId);
   const isAdmin = teamIds.includes(env.TEAM_ADMINS_ID);
+  const isOps = teamIds.includes(env.TEAM_OPS_ID);
   const isDriver = teamIds.includes(env.TEAM_DRIVERS_ID);
 
-  // Determinar rol basado únicamente en teams
+  // Determinar rol basado en teams (orden de prioridad: Admin > Ops > Driver)
   let role = "anonymous";
   if (isAdmin) {
     role = "admin";
+  } else if (isOps) {
+    role = "ops";
   } else if (isDriver) {
     role = "driver";
   }
 
   const isLoading = loadingMemberships || loadingProfile;
 
-  // Debug logs
-  console.log("[ROLE] Debug:", {
-    memberships,
-    teamIds,
-    isAdmin,
-    isDriver,
-    role,
-    isLoading,
-    TEAM_ADMINS_ID: env.TEAM_ADMINS_ID,
-    TEAM_DRIVERS_ID: env.TEAM_DRIVERS_ID,
-  });
+  // Debug logs (reduced frequency)
+  if (Math.random() < 0.05) {
+    console.log("[ROLE] Debug:", {
+      memberships,
+      teamIds,
+      isAdmin,
+      isOps,
+      isDriver,
+      role,
+      isLoading,
+      TEAM_ADMINS_ID: env.TEAM_ADMINS_ID,
+      TEAM_OPS_ID: env.TEAM_OPS_ID,
+      TEAM_DRIVERS_ID: env.TEAM_DRIVERS_ID,
+    });
+  }
 
   // Funciones de utilidad para permisos
   const can = {
-    createUsers: () => isAdmin,
-    editAnyUser: () => isAdmin,
+    // Gestión de usuarios
+    createUsers: () => isAdmin || isOps,
+    createAdminUsers: () => isAdmin,
+    createOpsUsers: () => isAdmin,
+    createDriverUsers: () => isAdmin || isOps,
+
+    // Ver usuarios
     viewAllUsers: () => isAdmin,
-    editOwnProfile: () => isAdmin, // Solo admins pueden editar perfiles
-    viewOwnProfile: () => isAdmin || isDriver, // Drivers pueden ver pero no editar
+    viewOpsAndDrivers: () => isAdmin || isOps,
+    viewOnlyDrivers: () => isOps,
+
+    // Editar usuarios
+    editAnyUser: () => isAdmin,
+    editOpsAndDrivers: () => isAdmin || isOps,
+    editOnlyDrivers: () => isOps,
+
+    // Perfiles
+    editOwnProfile: () => isAdmin || isOps, // Admin y Ops pueden editar perfiles
+    viewOwnProfile: () => isAdmin || isOps || isDriver, // Todos pueden ver su perfil
+
+    // Administración general
     manageCompanies: () => isAdmin,
     manageBuckets: () => isAdmin,
-    accessAdminPanel: () => isAdmin,
+    accessAdminPanel: () => isAdmin || isOps,
+    accessUsersManagement: () => isAdmin || isOps,
   };
 
   return {
@@ -58,6 +82,7 @@ export function useRole() {
     teamIds,
     isLoading,
     isAdmin,
+    isOps,
     isDriver,
     profile,
     can,

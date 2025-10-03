@@ -13,6 +13,7 @@ import NotFound from "./pages/shared/NotFound";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/Dashboard";
+import UsersManagement from "./pages/UsersManagement";
 
 // Driver Pages
 import DriverDashboard from "./pages/driver/Dashboard";
@@ -81,6 +82,16 @@ export default function App() {
           element={
             <Protected allow={["admin"]}>
               <AdminDashboard />
+            </Protected>
+          }
+        />
+
+        {/* Gestión de Usuarios - Admin y Ops */}
+        <Route
+          path="admin/users"
+          element={
+            <Protected allow={["admin", "ops"]}>
+              <UsersManagement />
             </Protected>
           }
         />

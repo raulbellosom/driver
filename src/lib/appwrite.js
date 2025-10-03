@@ -46,21 +46,27 @@ export async function getMemberships() {
 
     // Método 2: Probar acceso directo a cada team para determinar membership
     const teamsToCheck = [
-      { id: env.TEAM_ADMINS_ID, name: "dp_admins" },
-      { id: env.TEAM_DRIVERS_ID, name: "dp_drivers" },
-    ];
+      env.TEAM_ADMINS_ID && { id: env.TEAM_ADMINS_ID, name: "dp_admins" },
+      env.TEAM_DRIVERS_ID && { id: env.TEAM_DRIVERS_ID, name: "dp_drivers" },
+    ].filter(Boolean);
 
     for (const team of teamsToCheck) {
       try {
         // Intentar obtener info del team - si funciona, el usuario es miembro
         const teamInfo = await teams.get(team.id);
-        console.log(`[APPWRITE] User IS member of ${team.name}:`, teamInfo);
+        console.log(
+          `[APPWRITE] User IS member of ${team.name}:`,
+          teamInfo.name
+        );
         memberships.push({ teamId: team.id, teamName: team.name });
       } catch (teamError) {
-        console.log(
-          `[APPWRITE] User NOT member of ${team.name}:`,
-          teamError.message
-        );
+        // Solo loggear errores que no sean 404 (no encontrado/sin acceso)
+        if (teamError.code !== 404) {
+          console.warn(
+            `[APPWRITE] Error checking ${team.name}:`,
+            teamError.message
+          );
+        }
       }
     }
 

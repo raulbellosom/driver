@@ -19,20 +19,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../../utils";
 import Button from "../common/Button";
 import { useAuth } from "../../hooks/useAuth";
+import { useRole } from "../../hooks/useRole";
 
-const Sidebar = ({
-  isOpen,
-  onClose,
-  userRole = "admin",
-  isCollapsed,
-  onToggleCollapse,
-}) => {
+const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
   const location = useLocation();
   const { logout } = useAuth();
+  const { role } = useRole();
 
   // Definir navegación según el rol
   const getNavigationItems = () => {
-    if (userRole === "admin" || userRole === "owner") {
+    if (role === "admin") {
       return [
         {
           section: "Panel Principal",
@@ -47,7 +43,21 @@ const Sidebar = ({
       ];
     }
 
-    if (userRole === "driver") {
+    if (role === "ops") {
+      return [
+        {
+          section: "Operaciones",
+          items: [
+            { name: "Dashboard", href: "/admin", icon: Home },
+            { name: "Usuarios", href: "/admin/users", icon: Users },
+            { name: "Viajes", href: "/admin/trips", icon: MapPin },
+            { name: "Reportes", href: "/admin/reports", icon: BarChart3 },
+          ],
+        },
+      ];
+    }
+
+    if (role === "driver") {
       return [
         {
           section: "Mi Panel",

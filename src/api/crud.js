@@ -18,12 +18,51 @@ export async function fetchHealth() {
 // Companies CRUD (Task T5 - Esqueleto DB)
 export async function fetchCompanies() {
   try {
-    const response = await db.listDocuments(
-      env.DB_ID,
-      "companies", // Este ID se actualizará cuando se cree la colección
-      []
-    );
-    return response.documents;
+    // For now, return simulated companies data
+    // TODO: Replace with real Appwrite database call when collections are set up
+    const simulatedCompanies = [
+      {
+        $id: "company_racoondevs",
+        name: "RacoonDevs Transportation",
+        rfc: "RDT123456789",
+        address: "Av. Tecnológico 1234, Guadalajara, Jalisco",
+        contactName: "Roberto Admin",
+        contactEmail: "admin@racoondevs.com",
+        contactPhone: "+523221234567",
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        $id: "company_transport_mx",
+        name: "Transport MX",
+        rfc: "TMX987654321",
+        address: "Blvd. López Mateos 567, Zapopan, Jalisco",
+        contactName: "María García",
+        contactEmail: "maria@transportmx.com",
+        contactPhone: "+523331234567",
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        $id: "company_logistica_del_oeste",
+        name: "Logística del Oeste",
+        rfc: "LDO456789123",
+        address: "Calle Industria 890, Tlaquepaque, Jalisco",
+        contactName: "José López",
+        contactEmail: "jose@logisticadeloeste.com",
+        contactPhone: "+523311234567",
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+
+    // Simulate network delay
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    return simulatedCompanies;
   } catch (error) {
     throw new Error(`Error fetching companies: ${error.message}`);
   }

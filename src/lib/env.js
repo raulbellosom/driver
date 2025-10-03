@@ -5,6 +5,7 @@ export const env = {
 
   // Teams (T1)
   TEAM_ADMINS_ID: import.meta.env.VITE_APPWRITE_TEAM_ADMINS_ID,
+  TEAM_OPS_ID: import.meta.env.VITE_APPWRITE_TEAM_OPS_ID,
   TEAM_DRIVERS_ID: import.meta.env.VITE_APPWRITE_TEAM_DRIVERS_ID,
 
   // Collections (T2, T5)

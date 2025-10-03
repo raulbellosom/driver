@@ -98,11 +98,8 @@ const CardFooter = React.forwardRef(
 
 CardFooter.displayName = "CardFooter";
 
-export {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-};
+// Export Card as default to match project pattern
+export default Card;
+
+// Named exports for sub-components
+export { CardHeader, CardTitle, CardDescription, CardContent, CardFooter };

@@ -1,259 +1,1965 @@
-schema_version: '1.0'
+schema_version: "1.0"
 provider: appwrite
-generated_at: '2025-10-01T15:27:40.127691Z'
+generated_at: "2025-10-02T00:00:00Z"
 notes:
-- 'Boolean defaults + required: Appwrite UI actualmente no permite default si el atributo
-  es required; manejar default en Functions o en el cliente.'
-- Appwrite no permite índices sobre campos de tipo Relationship; documentados aquí
-  como 'not_supported_by_appwrite' cuando aplique.
+  - "Boolean defaults + required: Appwrite UI no permite default si el atributo es required; manejar default en Functions o cliente."
+  - "Appwrite no permite índices sobre Relationship; por eso sólo se indexan escalares. Donde un índice relacional sería útil, lo documento en index_notes."
+  - "Convención: todas las colecciones usan enabled:boolean, createdAt, updatedAt (manejar en Functions)."
+
 users:
-  description: Colección del sistema Appwrite Auth (no en la base de datos).
+  description: Colección del sistema Appwrite Auth (no en la base de datos)
   fields:
-  - name: $id
-    type: string
-    system: true
-  - name: email
-    type: email
-    system: true
-  - name: phone
-    type: string
-    system: true
-  - name: name
-    type: string
-    system: true
-  - name: status
-    type: integer
-    system: true
-  - name: passwordUpdate
-    type: datetime
-    system: true
-  - name: registration
-    type: datetime
-    system: true
+    - { name: $id, type: string, system: true }
+    - { name: email, type: email, system: true }
+    - { name: phone, type: string, system: true }
+    - { name: name, type: string, system: true }
+    - { name: status, type: integer, system: true }
+    - { name: passwordUpdate, type: datetime, system: true }
+    - { name: registration, type: datetime, system: true }
+
 database:
   collections:
-  - key: companies
-    name: Companies
-    attributes:
-    - name: name
-      type: string
-      required: true
-    - name: rfc
-      type: string
-      required: false
-    - name: address
-      type: string
-      required: false
-    - name: contactName
-      type: string
-      required: false
-    - name: contactEmail
-      type: email
-      required: false
-    - name: contactPhone
-      type: string
-      required: false
-    - name: enabled
-      type: boolean
-      required: true
-      default_supported: false
-    - name: usersProfile
-      type: relationship
-      required: false
-      relationship:
-        target: usersProfile
-        cardinality: oneToMany
-        owning_side: false
-        inverse_of: companies
-        on_delete: cascade
-    indexes:
-    - name: idx_companies_rfc
-      type: unique
-      fields:
-      - rfc
-    - name: idx_companies_name
-      type: fulltext
-      fields:
-      - name
-      - address
-  - key: usersProfile
-    name: usersProfile
-    attributes:
-    - name: userId
-      type: string
-      required: true
-    - name: displayName
-      type: string
-      required: false
-    - name: avatarUrl
-      type: url
-      required: false
-    - name: companies
-      type: relationship
-      required: false
-      relationship:
-        target: companies
-        cardinality: manyToOne
-        owning_side: true
-        inverse_of: usersProfile
-        on_delete: setNull
-    - name: isDriver
-      type: boolean
-      required: true
-      default_supported: false
-    - name: licenseNumber
-      type: string
-      required: false
-    - name: licenseExpiry
-      type: datetime
-      required: false
-    - name: licenseClass
-      type: string
-      required: false
-    - name: enabled
-      type: boolean
-      required: true
-      default_supported: false
-    indexes:
-    - name: uniq_users_profile_userId
-      type: unique
-      fields:
-      - userId
+    # =========================
+    #  Organización & Perfiles
+    # =========================
+    - key: companies
+      name: companies
+      attributes:
+        - {
+            name: name,
+            type: string,
+            required: true,
+            constraints: { min_size: 1, max_size: 120 },
+          }
+        - {
+            name: rfc,
+            type: string,
+            required: false,
+            constraints: { max_size: 20 },
+          }
+        - {
+            name: address,
+            type: string,
+            required: false,
+            constraints: { max_size: 250 },
+          }
+        - {
+            name: contactName,
+            type: string,
+            required: false,
+            constraints: { max_size: 120 },
+          }
+        - { name: contactEmail, type: email, required: false }
+        - {
+            name: contactPhone,
+            type: string,
+            required: false,
+            constraints: { max_size: 25 },
+          }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        # Inversa hacia usersProfile
+        - name: usersProfile
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: oneToMany,
+              owning_side: false,
+              inverse_of: companies,
+              on_delete: cascade,
+            }
+      indexes:
+        - { name: uniq_companies_rfc, type: unique, fields: [rfc] }
+        - {
+            name: ft_companies_name_address,
+            type: fulltext,
+            fields: [name, address],
+          }
+
+    - key: users_profile
+      name: users_profile
+      attributes:
+        - {
+            name: userId,
+            type: string,
+            required: true,
+            constraints: { max_size: 64 },
+          } # $id de Auth
+        - {
+            name: displayName,
+            type: string,
+            required: false,
+            constraints: { max_size: 120 },
+          }
+        - { name: avatarUrl, type: url, required: false }
+        - name: companies
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: usersProfile,
+              on_delete: setNull,
+            }
+        - {
+            name: isDriver,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          } # Diferenciador Admin/Driver
+        - {
+            name: licenseNumber,
+            type: string,
+            required: false,
+            constraints: { max_size: 50 },
+          }
+        - { name: licenseExpiry, type: datetime, required: false }
+        - {
+            name: licenseClass,
+            type: string,
+            required: false,
+            constraints: { max_size: 30 },
+          }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: uniq_users_profile_userId, type: unique, fields: [userId] }
+
     - key: driver_licenses
-    name: driver_licenses
-    attributes:
-      - name: usersProfile
-        type: relationship
-        required: true
-        relationship:
-          target: usersProfile
-          cardinality: manyToOne
-          owning_side: true
-          inverse_of: null
-          on_delete: cascade
-      - name: frontFileUrl
-        type: url
-        required: false
-      - name: backFileUrl
-        type: url
-        required: false
-      - name: status
-        type: enum
-        required: true
-        values: [pending, approved, rejected]
-      - name: reviewedByUserId
-        type: string
-        required: false
-      - name: reviewNotes
-        type: string
-        required: false
-      - name: enabled
-        type: boolean
-        required: true
-        default_supported: false   # Appwrite UI no permite default si es required
-      - name: userId
-        type: string
-        required: true
-    indexes:
-      - name: idx_driver_licenses_userProfile
-        type: key
-        fields: [usersProfile]   # nota: Appwrite suele no indexar relationships; déjalo documentado
-      - name: idx_driver_licenses_userId
-        type: unique
-        fields: [userId]
-    notes:
-      - "Una licencia por usuario garantizada por el índice único en userId."
-      - "Si luego permites múltiples, cambia el índice a key y agrega un flag 'active'."
-  - key: vehicle_brands
-    name: vehicle_brands
-    attributes:
-    - name: name
-      type: string
-      required: true
-    - name: enabled
-      type: boolean
-      required: true
-      default_supported: false
-    - name: vehicleModels
-      type: relationship
-      required: false
-      relationship:
-        target: vehicle_models
-        cardinality: oneToMany
-        owning_side: false
-        inverse_of: brand
-        on_delete: restrict
-    indexes:
-    - name: uniq_vehicle_brands_name
-      type: unique
-      fields:
-      - name
-  - key: vehicle_types
-    name: vehicle_types
-    attributes:
-    - name: name
-      type: string
-      required: true
-    - name: description
-      type: string
-      required: false
-    - name: enabled
-      type: boolean
-      required: true
-      default_supported: false
-    - name: vehicleModels
-      type: relationship
-      required: false
-      relationship:
-        target: vehicle_models
-        cardinality: oneToMany
-        owning_side: false
-        inverse_of: type
-        on_delete: setNull
-    indexes:
-    - name: uniq_vehicle_types_name
-      type: unique
-      fields:
-      - name
-  - key: vehicle_models
-    name: vehicle_models
-    attributes:
-    - name: brand
-      type: relationship
-      required: false
-      relationship:
-        target: vehicle_brands
-        cardinality: manyToOne
-        owning_side: true
-        inverse_of: vehicleModels
-        on_delete: restrict
-    - name: type
-      type: relationship
-      required: false
-      relationship:
-        target: vehicle_types
-        cardinality: manyToOne
-        owning_side: true
-        inverse_of: vehicleModels
-        on_delete: setNull
-    - name: name
-      type: string
-      required: true
-    - name: year
-      type: integer
-      required: false
-      constraints:
-        min: 1900
-        max: 2100
-    - name: enabled
-      type: boolean
-      required: true
-      default_supported: false
-    indexes:
-    - name: uniq_vehicle_models_brand_name_year
-      type: unique
-      fields:
-      - name
-    index_notes:
-    - En Appwrite no se pueden indexar relationships; ideal sería un índice compuesto
-      [brand, name, year].
+      name: driver_licenses
+      attributes:
+        - name: usersProfile
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: cascade,
+            }
+        - { name: frontFileUrl, type: url, required: false }
+        - { name: backFileUrl, type: url, required: false }
+        - {
+            name: status,
+            type: enum,
+            required: true,
+            values: [pending, approved, rejected],
+          }
+        - {
+            name: reviewedByUserId,
+            type: string,
+            required: false,
+            constraints: { max_size: 64 },
+          }
+        - {
+            name: reviewNotes,
+            type: string,
+            required: false,
+            constraints: { max_size: 500 },
+          }
+        - {
+            name: userId,
+            type: string,
+            required: true,
+            constraints: { max_size: 64 },
+          } # redundante para índice
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: uniq_driver_licenses_userId, type: unique, fields: [userId] }
+      index_notes:
+        - "Buscar por usersProfile sería ideal; Appwrite no indexa relationships."
+
+    # ====================
+    #  Catálogos de Flota
+    # ====================
+    - key: vehicle_brands
+      name: vehicle_brands
+      attributes:
+        - {
+            name: name,
+            type: string,
+            required: true,
+            constraints: { min_size: 1, max_size: 100 },
+          }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - name: vehicleModels
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: vehicle_models,
+              cardinality: oneToMany,
+              owning_side: false,
+              inverse_of: brand,
+              on_delete: restrict,
+            }
+      indexes:
+        - { name: uniq_vehicle_brands_name, type: unique, fields: [name] }
+
+    - key: vehicle_types
+      name: vehicle_types
+      attributes:
+        - {
+            name: name,
+            type: string,
+            required: true,
+            constraints: { min_size: 1, max_size: 60 },
+          }
+        - {
+            name: description,
+            type: string,
+            required: false,
+            constraints: { max_size: 200 },
+          }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - name: vehicleModels
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: vehicle_models,
+              cardinality: oneToMany,
+              owning_side: false,
+              inverse_of: type,
+              on_delete: setNull,
+            }
+      indexes:
+        - { name: uniq_vehicle_types_name, type: unique, fields: [name] }
+
+    - key: vehicle_models
+      name: vehicle_models
+      attributes:
+        - name: brand
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: vehicle_brands,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: vehicleModels,
+              on_delete: restrict,
+            }
+        - name: type
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: vehicle_types,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: vehicleModels,
+              on_delete: setNull,
+            }
+        - {
+            name: name,
+            type: string,
+            required: true,
+            constraints: { min_size: 1, max_size: 100 },
+          }
+        - {
+            name: year,
+            type: integer,
+            required: false,
+            constraints: { min: 1900, max: 2100 },
+          }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: uniq_vehicle_models_name, type: unique, fields: [name] }
+      index_notes:
+        - "Ideal sería índice compuesto [brand, name, year]; Appwrite no indexa relationships."
+
+    - key: vehicles
+      name: vehicles
+      attributes:
+        - name: company
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: brand
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: vehicle_brands,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - name: model
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: vehicle_models,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - name: type
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: vehicle_types,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - {
+            name: plate,
+            type: string,
+            required: true,
+            constraints: { min_size: 4, max_size: 15 },
+          }
+        - {
+            name: vin,
+            type: string,
+            required: false,
+            constraints: { max_size: 30 },
+          }
+        - {
+            name: year,
+            type: integer,
+            required: false,
+            constraints: { min: 1900, max: 2100 },
+          }
+        - {
+            name: color,
+            type: string,
+            required: false,
+            constraints: { max_size: 40 },
+          }
+        - { name: acquisitionDate, type: datetime, required: false }
+        - { name: cost, type: float, required: false, constraints: { min: 0 } }
+        - {
+            name: mileage,
+            type: integer,
+            required: false,
+            constraints: { min: 0 },
+          }
+        - { name: odometerUnit, type: enum, required: true, values: [km, mi] }
+        - {
+            name: status,
+            type: enum,
+            required: true,
+            values: [active, maintenance, inactive, sold],
+          }
+        - {
+            name: condition,
+            type: enum,
+            required: true,
+            values: [new, semi_new, maintenance, repair, for_sale, rented],
+          }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: uniq_vehicles_plate, type: unique, fields: [plate] }
+        - { name: idx_vehicles_vin, type: key, fields: [vin] }
+        - { name: idx_vehicles_status, type: key, fields: [status] }
+
+    - key: vehicle_documents
+      name: vehicle_documents
+      attributes:
+        - name: vehicle
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: vehicles,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: cascade,
+            }
+        - {
+            name: type,
+            type: enum,
+            required: true,
+            values: [insurance_policy, circulation_card, invoice, photo, misc],
+          }
+        - { name: fileUrl, type: url, required: true }
+        - {
+            name: metadata,
+            type: string,
+            required: false,
+            constraints: { max_size: 2000 },
+          } # JSON string
+        - { name: validFrom, type: datetime, required: false }
+        - { name: validTo, type: datetime, required: false }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_vdocs_vehicle_type, type: key, fields: [type] }
+
+    - key: insurances
+      name: insurances
+      attributes:
+        - name: vehicle
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: vehicles,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: cascade,
+            }
+        - {
+            name: policyNumber,
+            type: string,
+            required: true,
+            constraints: { max_size: 80 },
+          }
+        - {
+            name: provider,
+            type: string,
+            required: false,
+            constraints: { max_size: 120 },
+          }
+        - {
+            name: coverage,
+            type: string,
+            required: false,
+            constraints: { max_size: 200 },
+          }
+        - { name: validFrom, type: datetime, required: false }
+        - { name: validTo, type: datetime, required: false }
+        - { name: fileUrl, type: url, required: false }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_insurances_validTo, type: key, fields: [validTo] }
+
+    - key: vehicle_odometers
+      name: vehicle_odometers
+      attributes:
+        - name: vehicle
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: vehicles,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: cascade,
+            }
+        - {
+            name: value,
+            type: integer,
+            required: true,
+            constraints: { min: 0 },
+          }
+        - {
+            name: source,
+            type: enum,
+            required: true,
+            values: [manual, trip, service],
+          }
+        - { name: at, type: datetime, required: true }
+        - {
+            name: note,
+            type: string,
+            required: false,
+            constraints: { max_size: 200 },
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_vodometers_vehicle_at, type: key, fields: [at] }
+
+    # ===========================
+    #  Tarjetas y Asignaciones
+    # ===========================
+    - key: recharge_cards
+      name: recharge_cards
+      attributes:
+        - name: company
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - {
+            name: code,
+            type: string,
+            required: true,
+            constraints: { min_size: 3, max_size: 60 },
+          }
+        - {
+            name: provider,
+            type: enum,
+            required: true,
+            values: [parkia, rfid, other],
+          }
+        - {
+            name: status,
+            type: enum,
+            required: true,
+            values: [active, blocked, lost],
+          }
+        - {
+            name: allowNegative,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: uniq_rcards_code, type: unique, fields: [code] }
+        - { name: idx_rcards_status, type: key, fields: [status] }
+
+    - key: drivers_assignments
+      name: drivers_assignments
+      attributes:
+        - name: driver
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: vehicle
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: vehicles,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: card
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: recharge_cards,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - { name: from, type: datetime, required: true }
+        - { name: to, type: datetime, required: false }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_dassign_to, type: key, fields: [to] }
+      index_notes:
+        - "Consultas por driver/vehicle activos usan to==null; considerar vistas en Functions."
+
+    - key: recharge_movements
+      name: recharge_movements
+      attributes:
+        - name: card
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: recharge_cards,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: cascade,
+            }
+        - {
+            name: type,
+            type: enum,
+            required: true,
+            values: [topup, spend, adjust],
+          }
+        - { name: amount, type: float, required: true }
+        - {
+            name: currency,
+            type: enum,
+            required: true,
+            values: [MXN, USD, EUR],
+          }
+        - name: trip
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: trips,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - name: byUser
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - {
+            name: note,
+            type: string,
+            required: false,
+            constraints: { max_size: 300 },
+          }
+        - {
+            name: files,
+            type: url (appwrite array),
+            required: false,
+            constraints: { max_size: 2000 },
+          } # JSON string array of URLs
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: at, type: datetime, required: true }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_rmov_card_at, type: key, fields: [at] }
+
+    # ===========================
+    #  Búsquedas (Timers) & Viajes
+    # ===========================
+    - key: trip_searches
+      name: trip_searches
+      attributes:
+        - name: company
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: requestedBy
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: vehicle
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: vehicles,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - name: card
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: recharge_cards,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - {
+            name: criteria,
+            type: string,
+            required: false,
+            constraints: { max_size: 1500 },
+          } # JSON string (zona, notas, etc.)
+        - {
+            name: status,
+            type: enum,
+            required: true,
+            values: [open, matched, closed, expired],
+          }
+        - { name: expiresAt, type: datetime, required: true }
+        - {
+            name: alertSchedule,
+            type: string,
+            required: true,
+            constraints: { max_size: 50 },
+          } # Ej. "15,10,5"
+        - {
+            name: alertsSent,
+            type: string,
+            required: false,
+            constraints: { max_size: 50 },
+          } # Ej. "15,10"
+        - { name: nextAlertAt, type: datetime, required: false }
+        - { name: closedAt, type: datetime, required: false }
+        - name: matchedTrip
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: trips,
+              cardinality: oneToOne,
+              owning_side: false,
+              inverse_of: tripSearch,
+              on_delete: setNull,
+            }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_tsearch_status, type: key, fields: [status] }
+        - { name: idx_tsearch_expires, type: key, fields: [expiresAt] }
+
+    - key: trips
+      name: trips
+      attributes:
+        - name: company
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - {
+            name: type,
+            type: enum,
+            required: true,
+            values: [regular, with_card],
+          }
+        - {
+            name: status,
+            type: enum,
+            required: true,
+            values:
+              [
+                draft,
+                searching,
+                assigned,
+                started,
+                paused,
+                resumed,
+                finished,
+                cancelled,
+              ],
+          }
+        - name: driver
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: vehicle
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: vehicles,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: card
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: recharge_cards,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        # Origen / Destino
+        - { name: originType, type: enum, required: true, values: [text, geo] }
+        - {
+            name: originText,
+            type: string,
+            required: false,
+            constraints: { max_size: 200 },
+          }
+        - { name: originLat, type: float, required: false }
+        - { name: originLon, type: float, required: false }
+        - {
+            name: destinationType,
+            type: enum,
+            required: true,
+            values: [text, geo],
+          }
+        - {
+            name: destinationText,
+            type: string,
+            required: false,
+            constraints: { max_size: 200 },
+          }
+        - { name: destinationLat, type: float, required: false }
+        - { name: destinationLon, type: float, required: false }
+        # Tiempos
+        - { name: scheduledAt, type: datetime, required: false }
+        - { name: assignedAt, type: datetime, required: false }
+        - { name: startedAt, type: datetime, required: false }
+        - { name: pausedAt, type: datetime, required: false }
+        - { name: resumedAt, type: datetime, required: false }
+        - { name: finishedAt, type: datetime, required: false }
+        - { name: cancelledAt, type: datetime, required: false }
+        # Métricas
+        - {
+            name: odometerStart,
+            type: integer,
+            required: false,
+            constraints: { min: 0 },
+          }
+        - {
+            name: odometerEnd,
+            type: integer,
+            required: false,
+            constraints: { min: 0 },
+          }
+        - {
+            name: distanceKm,
+            type: float,
+            required: false,
+            constraints: { min: 0 },
+          }
+        # Financieros
+        - { name: fare, type: float, required: false, constraints: { min: 0 } }
+        - {
+            name: currency,
+            type: enum,
+            required: false,
+            values: [MXN, USD, EUR],
+          }
+        - {
+            name: paymentMethod,
+            type: enum,
+            required: false,
+            values: [cash, card, transfer, other],
+          }
+        - {
+            name: paymentRef,
+            type: string,
+            required: false,
+            constraints: { max_size: 80 },
+          }
+        # Vinculación a búsqueda
+        - name: tripSearch
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: trip_searches,
+              cardinality: oneToOne,
+              owning_side: true,
+              inverse_of: matchedTrip,
+              on_delete: setNull,
+            }
+        - {
+            name: notes,
+            type: string,
+            required: false,
+            constraints: { max_size: 500 },
+          }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_trips_status, type: key, fields: [status] }
+        - { name: idx_trips_startedAt, type: key, fields: [startedAt] }
+        - { name: idx_trips_finishedAt, type: key, fields: [finishedAt] }
+        - { name: idx_trips_type, type: key, fields: [type] }
+        - { name: idx_trips_payMethod, type: key, fields: [paymentMethod] }
+
+    - key: trip_events
+      name: trip_events
+      attributes:
+        - name: trip
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: trips,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: cascade,
+            }
+        - name: byUser
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - {
+            name: event,
+            type: enum,
+            required: true,
+            values:
+              [
+                created,
+                assigned,
+                started,
+                paused,
+                resumed,
+                finished,
+                cancelled,
+                note,
+                location_ping,
+              ],
+          }
+        - {
+            name: details,
+            type: string,
+            required: false,
+            constraints: { max_size: 1000 },
+          } # JSON/string libre
+        - { name: at, type: datetime, required: true }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_tevents_trip_at, type: key, fields: [at] }
+        - { name: idx_tevents_event, type: key, fields: [event] }
+
+    - key: trip_positions
+      name: trip_positions
+      attributes:
+        - name: trip
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: trips,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: cascade,
+            }
+        - name: vehicle
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: vehicles,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - { name: at, type: datetime, required: true }
+        - { name: lat, type: float, required: true }
+        - { name: lon, type: float, required: true }
+        - { name: speed, type: float, required: false, constraints: { min: 0 } }
+        - {
+            name: heading,
+            type: float,
+            required: false,
+            constraints: { min: 0, max: 360 },
+          }
+        - {
+            name: source,
+            type: enum,
+            required: true,
+            values: [driver_app, device, other],
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_tpos_trip_at, type: key, fields: [at] }
+
+    - key: payments
+      name: payments
+      attributes:
+        - name: company
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - {
+            name: subjectType,
+            type: enum,
+            required: true,
+            values: [trip, service, fee, other],
+          }
+        - {
+            name: subjectId,
+            type: string,
+            required: true,
+            constraints: { max_size: 64 },
+          }
+        - { name: amount, type: float, required: true }
+        - {
+            name: currency,
+            type: enum,
+            required: true,
+            values: [MXN, USD, EUR],
+          }
+        - {
+            name: method,
+            type: enum,
+            required: true,
+            values: [cash, card, transfer, other],
+          }
+        - { name: when, type: datetime, required: true }
+        - {
+            name: note,
+            type: string,
+            required: false,
+            constraints: { max_size: 250 },
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_payments_when, type: key, fields: [when] }
+        - { name: idx_payments_type, type: key, fields: [subjectType] }
+
+    # ===========================
+    #  Mantenimiento & Costos
+    # ===========================
+    - key: maintenance_reports
+      name: maintenance_reports
+      attributes:
+        - name: company
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: vehicle
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: vehicles,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: reporter
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - {
+            name: category,
+            type: enum,
+            required: true,
+            values: [service, fault, other],
+          }
+        - {
+            name: title,
+            type: string,
+            required: true,
+            constraints: { max_size: 160 },
+          }
+        - {
+            name: description,
+            type: string,
+            required: true,
+            constraints: { max_size: 2000 },
+          }
+        - {
+            name: severity,
+            type: enum,
+            required: true,
+            values: [low, medium, high],
+          }
+        - {
+            name: status,
+            type: enum,
+            required: true,
+            values: [open, in_progress, done, cancelled],
+          }
+        - {
+            name: attachments,
+            type: string,
+            required: false,
+            constraints: { max_size: 2000 },
+          } # lista JSON de URLs
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_mreports_status, type: key, fields: [status] }
+        - { name: idx_mreports_severity, type: key, fields: [severity] }
+
+    - key: maintenance_orders
+      name: maintenance_orders
+      attributes:
+        - name: company
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: vehicle
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: vehicles,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - { name: openedAt, type: datetime, required: true }
+        - { name: closedAt, type: datetime, required: false }
+        - {
+            name: status,
+            type: enum,
+            required: true,
+            values: [open, in_progress, done, cancelled],
+          }
+        - {
+            name: providerName,
+            type: string,
+            required: false,
+            constraints: { max_size: 160 },
+          }
+        - {
+            name: providerRfc,
+            type: string,
+            required: false,
+            constraints: { max_size: 20 },
+          }
+        - {
+            name: estimatedCost,
+            type: float,
+            required: false,
+            constraints: { min: 0 },
+          }
+        - {
+            name: finalCost,
+            type: float,
+            required: false,
+            constraints: { min: 0 },
+          }
+        - {
+            name: currency,
+            type: enum,
+            required: true,
+            values: [MXN, USD, EUR],
+          }
+        - {
+            name: notes,
+            type: string,
+            required: false,
+            constraints: { max_size: 500 },
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_morders_status, type: key, fields: [status] }
+        - { name: idx_morders_openedAt, type: key, fields: [openedAt] }
+
+    - key: maintenance_items
+      name: maintenance_items
+      attributes:
+        - name: maintenanceOrder
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: maintenance_orders,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: cascade,
+            }
+        - {
+            name: type,
+            type: enum,
+            required: true,
+            values: [part, labor, misc],
+          }
+        - {
+            name: description,
+            type: string,
+            required: true,
+            constraints: { max_size: 250 },
+          }
+        - { name: qty, type: float, required: true, constraints: { min: 0 } }
+        - {
+            name: unitPrice,
+            type: float,
+            required: true,
+            constraints: { min: 0 },
+          }
+        - {
+            name: currency,
+            type: enum,
+            required: true,
+            values: [MXN, USD, EUR],
+          }
+        - { name: lineTotal, type: float, required: false }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_mitems_type, type: key, fields: [type] }
+
+    - key: fuel_logs
+      name: fuel_logs
+      attributes:
+        - name: company
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: vehicle
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: vehicles,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: driver
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - { name: when, type: datetime, required: true }
+        - { name: liters, type: float, required: true, constraints: { min: 0 } }
+        - {
+            name: pricePerLiter,
+            type: float,
+            required: true,
+            constraints: { min: 0 },
+          }
+        - { name: total, type: float, required: false }
+        - {
+            name: currency,
+            type: enum,
+            required: true,
+            values: [MXN, USD, EUR],
+          }
+        - {
+            name: odometer,
+            type: integer,
+            required: false,
+            constraints: { min: 0 },
+          }
+        - {
+            name: stationName,
+            type: string,
+            required: false,
+            constraints: { max_size: 160 },
+          }
+        - { name: ticketUrl, type: url, required: false }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_fuel_when, type: key, fields: [when] }
+
+    - key: expenses
+      name: expenses
+      attributes:
+        - name: company
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: vehicle
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: vehicles,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - name: driver
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - {
+            name: category,
+            type: enum,
+            required: true,
+            values: [toll, parking, wash, fine, other],
+          }
+        - { name: when, type: datetime, required: true }
+        - { name: amount, type: float, required: true }
+        - {
+            name: currency,
+            type: enum,
+            required: true,
+            values: [MXN, USD, EUR],
+          }
+        - {
+            name: note,
+            type: string,
+            required: false,
+            constraints: { max_size: 250 },
+          }
+        - { name: fileUrl, type: url, required: false }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_expenses_when, type: key, fields: [when] }
+        - { name: idx_expenses_category, type: key, fields: [category] }
+
+    - key: recurring_services
+      name: recurring_services
+      attributes:
+        - name: company
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - name: vehicle
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: vehicles,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - {
+            name: title,
+            type: string,
+            required: true,
+            constraints: { max_size: 160 },
+          }
+        - {
+            name: type,
+            type: enum,
+            required: true,
+            values: [tax, verification, maintenance, other],
+          }
+        - { name: amount, type: float, required: true, constraints: { min: 0 } }
+        - {
+            name: currency,
+            type: enum,
+            required: true,
+            values: [MXN, USD, EUR],
+          }
+        - {
+            name: periodicity,
+            type: enum,
+            required: true,
+            values: [monthly, quarterly, yearly, custom],
+          }
+        - {
+            name: customMonths,
+            type: string,
+            required: false,
+            constraints: { max_size: 50 },
+          } # Ej. "2,5,8,11"
+        - { name: nextDueDate, type: datetime, required: true }
+        - {
+            name: reminderDays,
+            type: integer,
+            required: true,
+            constraints: { min: 0, max: 60 },
+          }
+        - { name: status, type: enum, required: true, values: [active, paused] }
+        - {
+            name: notes,
+            type: string,
+            required: false,
+            constraints: { max_size: 300 },
+          }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_rservices_nextDue, type: key, fields: [nextDueDate] }
+        - { name: idx_rservices_status, type: key, fields: [status] }
+
+    # ===========================
+    #  Rutas, Zonas (opcional)
+    # ===========================
+    - key: route_templates
+      name: route_templates
+      attributes:
+        - name: company
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - {
+            name: name,
+            type: string,
+            required: true,
+            constraints: { max_size: 160 },
+          }
+        - {
+            name: fromText,
+            type: string,
+            required: false,
+            constraints: { max_size: 160 },
+          }
+        - {
+            name: toText,
+            type: string,
+            required: false,
+            constraints: { max_size: 160 },
+          }
+        - { name: fromLat, type: float, required: false }
+        - { name: fromLon, type: float, required: false }
+        - { name: toLat, type: float, required: false }
+        - { name: toLon, type: float, required: false }
+        - {
+            name: distanceKm,
+            type: float,
+            required: false,
+            constraints: { min: 0 },
+          }
+        - {
+            name: expectedDurationMin,
+            type: integer,
+            required: false,
+            constraints: { min: 0 },
+          }
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_rtemplates_name, type: key, fields: [name] }
+
+    - key: route_waypoints
+      name: route_waypoints
+      attributes:
+        - name: routeTemplate
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: route_templates,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: cascade,
+            }
+        - {
+            name: order,
+            type: integer,
+            required: true,
+            constraints: { min: 0, max: 1000 },
+          }
+        - {
+            name: label,
+            type: string,
+            required: false,
+            constraints: { max_size: 120 },
+          }
+        - { name: lat, type: float, required: true }
+        - { name: lon, type: float, required: true }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_rwaypoints_order, type: key, fields: [order] }
+
+    - key: zones
+      name: zones
+      attributes:
+        - name: company
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: restrict,
+            }
+        - {
+            name: name,
+            type: string,
+            required: true,
+            constraints: { max_size: 120 },
+          }
+        - {
+            name: polygonGeoJson,
+            type: string,
+            required: false,
+            constraints: { max_size: 8000 },
+          } # GeoJSON como string
+        - {
+            name: enabled,
+            type: boolean,
+            required: true,
+            default_supported: false,
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_zones_name, type: key, fields: [name] }
+
+    # ===========================
+    #  Timers & Notificaciones
+    # ===========================
+    - key: timer_jobs
+      name: timer_jobs
+      attributes:
+        - name: company
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - {
+            name: kind,
+            type: enum,
+            required: true,
+            values:
+              [
+                trip_search_alert,
+                trip_search_expire,
+                service_due_alert,
+                generic,
+              ],
+          }
+        - {
+            name: subjectId,
+            type: string,
+            required: true,
+            constraints: { max_size: 64 },
+          }
+        - {
+            name: subjectCollection,
+            type: string,
+            required: true,
+            constraints: { max_size: 64 },
+          }
+        - { name: runAt, type: datetime, required: true }
+        - {
+            name: payload,
+            type: string,
+            required: false,
+            constraints: { max_size: 2000 },
+          } # JSON string
+        - {
+            name: status,
+            type: enum,
+            required: true,
+            values: [scheduled, processing, done, cancelled, failed],
+          }
+        - {
+            name: attempts,
+            type: integer,
+            required: true,
+            constraints: { min: 0, max: 20 },
+          }
+        - {
+            name: lastError,
+            type: string,
+            required: false,
+            constraints: { max_size: 500 },
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_tjobs_runAt, type: key, fields: [runAt] }
+        - { name: idx_tjobs_status, type: key, fields: [status] }
+
+    - key: notifications
+      name: notifications
+      attributes:
+        - name: company
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - name: user
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - {
+            name: channel,
+            type: enum,
+            required: true,
+            values: [push, email, sms, whatsapp],
+          }
+        - {
+            name: templateKey,
+            type: string,
+            required: true,
+            constraints: { max_size: 80 },
+          }
+        - {
+            name: data,
+            type: string,
+            required: false,
+            constraints: { max_size: 2000 },
+          } # JSON string
+        - {
+            name: status,
+            type: enum,
+            required: true,
+            values: [queued, sent, failed],
+          }
+        - { name: sentAt, type: datetime, required: false }
+        - {
+            name: error,
+            type: string,
+            required: false,
+            constraints: { max_size: 400 },
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_notifs_status, type: key, fields: [status] }
+        - { name: idx_notifs_channel, type: key, fields: [channel] }
+
+    - key: notification_preferences
+      name: notification_preferences
+      attributes:
+        - name: user
+          type: relationship
+          required: true
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: cascade,
+            }
+        - {
+            name: channelsEnabled,
+            type: string,
+            required: false,
+            constraints: { max_size: 120 },
+          } # Ej. "push,email"
+        - {
+            name: quietHours,
+            type: string,
+            required: false,
+            constraints: { max_size: 80 },
+          } # Ej. "22:00-06:00"
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: uniq_notif_prefs_user, type: unique, fields: [] } # Unicidad lógica por documento/ACL
+
+    # ===========================
+    #  Auditoría & Integración
+    # ===========================
+    - key: audits
+      name: audits
+      attributes:
+        - name: company
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: companies,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - name: who
+          type: relationship
+          required: false
+          relationship:
+            {
+              target: usersProfile,
+              cardinality: manyToOne,
+              owning_side: true,
+              inverse_of: null,
+              on_delete: setNull,
+            }
+        - {
+            name: what,
+            type: string,
+            required: true,
+            constraints: { max_size: 64 },
+          } # collection key
+        - {
+            name: docId,
+            type: string,
+            required: true,
+            constraints: { max_size: 64 },
+          }
+        - {
+            name: action,
+            type: enum,
+            required: true,
+            values: [create, update, delete, restore],
+          }
+        - {
+            name: diff,
+            type: string,
+            required: false,
+            constraints: { max_size: 4000 },
+          } # JSON string con cambios
+        - { name: at, type: datetime, required: true }
+        - {
+            name: ip,
+            type: string,
+            required: false,
+            constraints: { max_size: 45 },
+          }
+        - {
+            name: userAgent,
+            type: string,
+            required: false,
+            constraints: { max_size: 300 },
+          }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_audits_at, type: key, fields: [at] }
+        - { name: idx_audits_what, type: key, fields: [what] }
+
+    - key: webhooks_outbox
+      name: webhooks_outbox
+      attributes:
+        - {
+            name: eventKey,
+            type: string,
+            required: true,
+            constraints: { max_size: 80 },
+          }
+        - {
+            name: payload,
+            type: string,
+            required: true,
+            constraints: { max_size: 4000 },
+          } # JSON string
+        - { name: targetUrl, type: url, required: true }
+        - {
+            name: status,
+            type: enum,
+            required: true,
+            values: [queued, sent, failed],
+          }
+        - {
+            name: attempts,
+            type: integer,
+            required: true,
+            constraints: { min: 0, max: 10 },
+          }
+        - {
+            name: lastError,
+            type: string,
+            required: false,
+            constraints: { max_size: 400 },
+          }
+        - { name: sentAt, type: datetime, required: false }
+        - { name: createdAt, type: datetime, required: false }
+        - { name: updatedAt, type: datetime, required: false }
+      indexes:
+        - { name: idx_wh_outbox_status, type: key, fields: [status] }

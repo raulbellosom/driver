@@ -5,8 +5,7 @@ import { Shield, Lock, Eye, EyeOff, ArrowLeft, Key, Info } from "lucide-react";
 import { Link } from "react-router-dom";
 import { account } from "../../lib/appwrite";
 import { useNotifications } from "../../components/common/NotificationSystem";
-import {
-  Card,
+import Card, {
   CardContent,
   CardHeader,
   CardTitle,

@@ -40,6 +40,9 @@ export const AuthProvider = ({ children }) => {
   const isAdmin = user?.teams?.some(
     (team) => team.$id === import.meta.env.VITE_APPWRITE_TEAM_ADMINS_ID
   );
+  const isOps = user?.teams?.some(
+    (team) => team.$id === import.meta.env.VITE_APPWRITE_TEAM_OPS_ID
+  );
   const isDriver = user?.profile?.isDriver || false;
 
   // Función de login
@@ -207,6 +210,7 @@ export const AuthProvider = ({ children }) => {
 
     // Roles
     isAdmin,
+    isOps,
     isDriver,
 
     // Métodos
