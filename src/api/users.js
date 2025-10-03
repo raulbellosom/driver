@@ -15,7 +15,7 @@ export const usersService = {
         // Obtener usuarios de la colección de perfiles
         const profilesResponse = await db.listDocuments(
           env.DB_ID,
-          "users_profile", // Usar el ID de la colección cuando esté configurada
+          env.COLLECTION_USERS_PROFILE_ID, // Usar el ID correcto de la colección
           []
         );
 
