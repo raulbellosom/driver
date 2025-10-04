@@ -1,381 +1,507 @@
-import { account, db, teams } from "../lib/appwrite";
+import { account, db } from "../lib/appwrite";
 import { env } from "../lib/env";
-import { Query, ID, Permission, Role } from "appwrite";
+import { Query, ID } from "appwrite";
+import { authService } from "./auth";
 
 // ==========================================
-// USERS SERVICE - Gestión completa de usuarios
+// USERS SERVICE - Gestión completa de usuarios (sin teams)
 // ==========================================
 
 export const usersService = {
   // Listar usuarios con filtros según permisos
   async getUsers(filters = {}) {
     try {
-      // Intentar obtener usuarios reales de Appwrite
-      try {
-        // Obtener perfiles de la colección users_profile
-        const profilesResponse = await db.listDocuments(
-          env.DB_ID,
-          env.COLLECTION_USERS_PROFILE_ID,
-          []
-        );
+      // Verificar permisos del usuario actual
+      const currentUserProfile = await authService.getUserProfile();
+      if (!currentUserProfile) {
+        throw new Error("User profile not found");
+      }
 
-        console.log("[USERS] Profile documents:", profilesResponse.total);
+      const userRoles = currentUserProfile.roles || [];
+      const canViewUsers =
+        userRoles.includes("root") ||
+        userRoles.includes("admin") ||
+        userRoles.includes("ops");
 
-        // Procesar los perfiles disponibles
-        const users = profilesResponse.documents.map((profile) => {
-          return {
-            $id: profile.$id,
-            userId: profile.userId,
-            displayName: profile.displayName || profile.name || "Usuario",
-            name: profile.name || "Sin nombre",
-            email: profile.email || "Sin email", // Del perfil por ahora
-            phone: profile.phone || null,
-            isDriver: profile.isDriver || false,
-            enabled: profile.enabled ?? true,
-            teams: profile.teams || [],
-            role: profile.isDriver ? "driver" : "admin",
-            createdAt: profile.createdAt || profile.$createdAt,
-            updatedAt: profile.updatedAt || profile.$updatedAt,
-            profileExists: true,
-            labels: [],
-            status: true,
-          };
-        });
-
-        console.log("[USERS] Processed users:", users.length);
-        return users;
-      } catch (dbError) {
-        console.warn(
-          "[USERS] Error obteniendo usuarios reales:",
-          dbError.message
+      if (!canViewUsers) {
+        throw new Error(
+          "Access denied. Insufficient privileges to view users."
         );
       }
 
-      // Si no hay datos reales, devolver array vacío (no fake data)
-      return [];
+      // Obtener perfiles de la colección users_profile
+      const profilesResponse = await db.listDocuments({
+        databaseId: env.DB_ID,
+        collectionId: env.COLLECTION_USERS_PROFILE_ID,
+        queries: [],
+      });
 
-      // CÓDIGO ANTERIOR CON DATOS SIMULADOS - REMOVIDO
-      // const simulatedUsers = [
+      console.log("[USERS] Profile documents:", profilesResponse.total);
+
+      // Procesar los perfiles disponibles
+      const users = profilesResponse.documents.map((profile) => {
+        const roles = profile.roles || [];
+        const primaryRole = roles.includes("root")
+          ? "root"
+          : roles.includes("admin")
+          ? "admin"
+          : roles.includes("ops")
+          ? "ops"
+          : roles.includes("driver")
+          ? "driver"
+          : "unknown";
+
+        return {
+          $id: profile.$id,
+          userId: profile.userId,
+          displayName: profile.displayName || "Usuario",
+          name: profile.displayName || "Sin nombre",
+          email: profile.email || "Sin email", // Del perfil por ahora
+          phone: profile.phone || null,
+          roles: profile.roles || [],
+          primaryRole: primaryRole,
+          enabled: profile.enabled ?? true,
+          createdAt: profile.createdAt || profile.$createdAt,
+          updatedAt: profile.updatedAt || profile.$updatedAt,
+          profileExists: true,
+          labels: [],
+          status: true,
+          // Campos específicos de driver
+          licenseNumber: profile.licenseNumber || null,
+          licenseExpiry: profile.licenseExpiry || null,
+          licenseClass: profile.licenseClass || null,
+        };
+      });
+
+      // Filtrar usuarios según los permisos
+      let filteredUsers = users;
+
+      if (
+        userRoles.includes("ops") &&
+        !userRoles.includes("admin") &&
+        !userRoles.includes("root")
+      ) {
+        // Ops solo puede ver drivers y otros ops (no admins ni roots)
+        filteredUsers = users.filter((user) => {
+          const targetRoles = user.roles || [];
+          return targetRoles.includes("driver") || targetRoles.includes("ops");
+        });
+      }
+
+      // Ocultar usuarios root si no es root
+      if (!userRoles.includes("root")) {
+        filteredUsers = filteredUsers.filter((user) => {
+          const targetRoles = user.roles || [];
+          return !targetRoles.includes("root");
+        });
+      }
+
+      console.log("[USERS] Processed users:", filteredUsers.length);
+      return filteredUsers;
     } catch (error) {
-      console.error("[USERS] Error getting users:", error);
-      throw new Error(error.message || "Error al obtener usuarios");
+      console.error("[USERS] Error obteniendo usuarios:", error);
+      throw new Error(`Error fetching users: ${error.message}`);
     }
   },
 
   // Obtener un usuario específico por ID
   async getUserById(userId) {
     try {
-      // Obtener perfil del usuario
-      const profiles = await db.listDocuments(
-        env.DB_ID,
-        env.COLLECTION_USERS_PROFILE_ID,
-        [Query.equal("userId", userId)]
-      );
-
-      if (profiles.documents.length === 0) {
-        throw new Error("Usuario no encontrado");
+      // Verificar permisos del usuario actual
+      const currentUserProfile = await authService.getUserProfile();
+      if (!currentUserProfile) {
+        throw new Error("User profile not found");
       }
 
-      const profile = profiles.documents[0];
+      const userRoles = currentUserProfile.roles || [];
+      const canViewUser =
+        userRoles.includes("root") ||
+        userRoles.includes("admin") ||
+        userRoles.includes("ops");
+      const isOwnProfile = currentUserProfile.userId === userId;
 
-      // Obtener información de teams
-      const allMemberships = await Promise.all([
-        teams
-          .listMemberships(env.TEAM_ADMINS_ID, [Query.equal("userId", userId)])
-          .catch(() => ({ memberships: [] })),
-        teams
-          .listMemberships(env.TEAM_OPS_ID, [Query.equal("userId", userId)])
-          .catch(() => ({ memberships: [] })),
-        teams
-          .listMemberships(env.TEAM_DRIVERS_ID, [Query.equal("userId", userId)])
-          .catch(() => ({ memberships: [] })),
-      ]);
+      if (!canViewUser && !isOwnProfile) {
+        throw new Error("Access denied. Cannot view this user.");
+      }
 
-      const userTeams = [];
-      if (allMemberships[0].memberships?.length > 0)
-        userTeams.push({ id: env.TEAM_ADMINS_ID, name: "Administradores" });
-      if (allMemberships[1].memberships?.length > 0)
-        userTeams.push({ id: env.TEAM_OPS_ID, name: "Operaciones" });
-      if (allMemberships[2].memberships?.length > 0)
-        userTeams.push({ id: env.TEAM_DRIVERS_ID, name: "Conductores" });
+      // Buscar el perfil del usuario
+      const response = await db.listDocuments({
+        databaseId: env.DB_ID,
+        collectionId: env.COLLECTION_USERS_PROFILE_ID,
+        queries: [Query.equal("userId", userId), Query.limit(1)],
+      });
+
+      if (response.documents.length === 0) {
+        throw new Error("User profile not found");
+      }
+
+      const profile = response.documents[0];
+      const roles = profile.roles || [];
+      const primaryRole = roles.includes("root")
+        ? "root"
+        : roles.includes("admin")
+        ? "admin"
+        : roles.includes("ops")
+        ? "ops"
+        : roles.includes("driver")
+        ? "driver"
+        : "unknown";
 
       return {
         ...profile,
-        teams: userTeams,
-        role: userTeams.some((t) => t.id === env.TEAM_ADMINS_ID)
-          ? "admin"
-          : userTeams.some((t) => t.id === env.TEAM_OPS_ID)
-          ? "ops"
-          : userTeams.some((t) => t.id === env.TEAM_DRIVERS_ID)
-          ? "driver"
-          : "none",
+        primaryRole: primaryRole,
+        name: profile.displayName,
       };
     } catch (error) {
-      console.error("[USERS] Error getting user:", error);
-      throw new Error(error.message || "Error al obtener usuario");
+      console.error("[USERS] Error getting user by ID:", error);
+      throw new Error(`Error fetching user: ${error.message}`);
     }
   },
 
-  // Crear nuevo usuario completo (Appwrite + Profile)
+  // Crear un nuevo usuario
   async createUser(userData) {
     try {
-      const {
-        name,
-        email,
-        phone,
-        password,
-        teams: selectedTeams = [],
-        displayName,
-        isDriver = false,
-        enabled = true,
-        companyId = null,
-      } = userData;
+      // Verificar permisos del usuario actual
+      const currentUserProfile = await authService.getUserProfile();
+      if (!currentUserProfile) {
+        throw new Error("User profile not found");
+      }
 
-      // Validar formato de teléfono
-      if (phone && !/^\+\d{12,15}$/.test(phone)) {
+      const userRoles = currentUserProfile.roles || [];
+      const canCreateUsers =
+        userRoles.includes("root") ||
+        userRoles.includes("admin") ||
+        userRoles.includes("ops");
+
+      if (!canCreateUsers) {
         throw new Error(
-          "El teléfono debe tener el formato +523221234567 (incluyendo código de país)"
+          "Access denied. Insufficient privileges to create users."
         );
       }
 
-      // 1. Crear usuario en Appwrite Auth (usando función simulada por ahora)
-      // En una implementación real, esto llamaría a tu servidor
-      const { createUserOnServer } = await import("./admin");
-      const { user } = await createUserOnServer({
-        name,
-        email,
-        phone,
-        password,
-      });
+      // Validar que no se intenten crear roles superiores
+      const targetRoles = Array.isArray(userData.roles)
+        ? userData.roles
+        : [userData.role || "driver"];
 
-      try {
-        // 2. Crear perfil en users_profile
-        const profileData = {
-          userId: user.$id,
-          displayName: displayName || name,
-          isDriver,
-          enabled,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+      // Verificaciones de roles
+      if (targetRoles.includes("root") && !userRoles.includes("root")) {
+        throw new Error("Insufficient permissions to create root users");
+      }
 
-        // Agregar companyId si se proporcionó
-        if (companyId) {
-          profileData.companies = companyId;
+      if (
+        targetRoles.includes("admin") &&
+        !userRoles.includes("root") &&
+        !userRoles.includes("admin")
+      ) {
+        throw new Error("Insufficient permissions to create admin users");
+      }
+
+      if (
+        userRoles.includes("ops") &&
+        !userRoles.includes("admin") &&
+        !userRoles.includes("root")
+      ) {
+        // Ops solo puede crear drivers
+        if (!targetRoles.every((role) => role === "driver")) {
+          throw new Error("Ops can only create driver users");
         }
-
-        const profile = await db.createDocument(
-          env.DB_ID,
-          env.COLLECTION_USERS_PROFILE_ID,
-          ID.unique(),
-          profileData
-        );
-
-        // 3. Agregar usuario a los teams seleccionados
-        const teamPromises = selectedTeams.map((teamId) => {
-          return teams.createMembership(teamId, [], email);
-        });
-
-        await Promise.all(teamPromises);
-
-        return {
-          user,
-          profile,
-          teams: selectedTeams,
-        };
-      } catch (profileError) {
-        // Si falla crear el perfil, intentar eliminar el usuario de Appwrite
-        console.error(
-          "Error creating profile, attempting to cleanup user:",
-          profileError
-        );
-        // Aquí podrías llamar a una función para eliminar el usuario creado
-        throw new Error(
-          "Error al crear el perfil del usuario: " + profileError.message
-        );
-      }
-    } catch (error) {
-      console.error("[USERS] Error creating user:", error);
-      throw new Error(error.message || "Error al crear usuario");
-    }
-  },
-
-  // Actualizar información del usuario
-  async updateUser(userId, updates) {
-    try {
-      const {
-        name,
-        email,
-        phone,
-        teams: newTeams,
-        displayName,
-        isDriver,
-        enabled,
-        companyId,
-        ...profileUpdates
-      } = updates;
-
-      // 1. Actualizar información básica en Appwrite (si se proporcionó)
-      if (name || email || phone) {
-        const { updateUserOnServer } = await import("./admin");
-        await updateUserOnServer(userId, { name, email, phone });
       }
 
-      // 2. Actualizar perfil en users_profile
+      const { name, email, password } = userData;
+
+      console.log("[USERS] Creating new user:", email);
+
+      // Crear usuario en Appwrite Auth
+      const user = await account.create(ID.unique(), email, password, name);
+      console.log("[USERS] Auth user created:", user.$id);
+
+      // Crear perfil automáticamente
       const profileData = {
-        ...profileUpdates,
+        userId: user.$id,
+        displayName: name,
+        avatarUrl: null,
+        companies: null,
+        roles: targetRoles,
+        licenseNumber: null,
+        licenseExpiry: null,
+        licenseClass: null,
+        enabled: true,
+        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
-      if (displayName !== undefined) profileData.displayName = displayName;
-      if (isDriver !== undefined) profileData.isDriver = isDriver;
-      if (enabled !== undefined) profileData.enabled = enabled;
-      if (companyId !== undefined) profileData.companies = companyId;
-
-      // Obtener el documento del perfil actual
-      const currentProfiles = await db.listDocuments(
+      const profile = await db.createDocument(
         env.DB_ID,
         env.COLLECTION_USERS_PROFILE_ID,
-        [Query.equal("userId", userId)]
-      );
-
-      if (currentProfiles.documents.length === 0) {
-        throw new Error("Perfil de usuario no encontrado");
-      }
-
-      const currentProfile = currentProfiles.documents[0];
-
-      const updatedProfile = await db.updateDocument(
-        env.DB_ID,
-        env.COLLECTION_USERS_PROFILE_ID,
-        currentProfile.$id,
+        ID.unique(),
         profileData
       );
 
-      // 3. Actualizar membresías de teams si se proporcionaron
-      if (newTeams && Array.isArray(newTeams)) {
-        // Obtener membresías actuales
-        const currentMemberships = await Promise.all([
-          teams
-            .listMemberships(env.TEAM_ADMINS_ID, [
-              Query.equal("userId", userId),
-            ])
-            .catch(() => ({ memberships: [] })),
-          teams
-            .listMemberships(env.TEAM_OPS_ID, [Query.equal("userId", userId)])
-            .catch(() => ({ memberships: [] })),
-          teams
-            .listMemberships(env.TEAM_DRIVERS_ID, [
-              Query.equal("userId", userId),
-            ])
-            .catch(() => ({ memberships: [] })),
-        ]);
+      console.log("[USERS] User profile created:", profile.$id);
+      return {
+        ...user,
+        profile: profile,
+        roles: targetRoles,
+        primaryRole: targetRoles[0],
+      };
+    } catch (error) {
+      console.error("[USERS] Error creating user:", error);
+      throw new Error(`Error creating user: ${error.message}`);
+    }
+  },
 
-        // Obtener IDs de teams actuales
-        const currentTeamIds = [];
-        if (currentMemberships[0].memberships?.length > 0)
-          currentTeamIds.push(env.TEAM_ADMINS_ID);
-        if (currentMemberships[1].memberships?.length > 0)
-          currentTeamIds.push(env.TEAM_OPS_ID);
-        if (currentMemberships[2].memberships?.length > 0)
-          currentTeamIds.push(env.TEAM_DRIVERS_ID);
+  // Actualizar usuario existente
+  async updateUser(userId, updates) {
+    try {
+      // Verificar permisos del usuario actual
+      const currentUserProfile = await authService.getUserProfile();
+      if (!currentUserProfile) {
+        throw new Error("User profile not found");
+      }
 
-        // Remover de teams que ya no están en la nueva lista
-        const teamsToRemove = currentTeamIds.filter(
-          (teamId) => !newTeams.includes(teamId)
-        );
-        const teamsToAdd = newTeams.filter(
-          (teamId) => !currentTeamIds.includes(teamId)
-        );
+      const userRoles = currentUserProfile.roles || [];
+      const canUpdateUsers =
+        userRoles.includes("root") ||
+        userRoles.includes("admin") ||
+        userRoles.includes("ops");
+      const isOwnProfile = currentUserProfile.userId === userId;
 
-        // Remover membresías
-        for (const teamId of teamsToRemove) {
-          const memberships = await teams.listMemberships(teamId, [
-            Query.equal("userId", userId),
-          ]);
-          for (const membership of memberships.memberships) {
-            await teams.deleteMembership(teamId, membership.$id);
-          }
+      // Buscar el perfil del usuario objetivo
+      const targetResponse = await db.listDocuments({
+        databaseId: env.DB_ID,
+        collectionId: env.COLLECTION_USERS_PROFILE_ID,
+        queries: [Query.equal("userId", userId), Query.limit(1)],
+      });
+
+      if (targetResponse.documents.length === 0) {
+        throw new Error("Target user profile not found");
+      }
+
+      const targetProfile = targetResponse.documents[0];
+      const targetRoles = targetProfile.roles || [];
+
+      // Verificar permisos específicos
+      if (!canUpdateUsers && !isOwnProfile) {
+        throw new Error("Access denied. Cannot update this user.");
+      }
+
+      // Validaciones adicionales para roles
+      if (updates.roles) {
+        const newRoles = Array.isArray(updates.roles) ? updates.roles : [];
+
+        // Solo root puede modificar roles root
+        if (
+          (targetRoles.includes("root") || newRoles.includes("root")) &&
+          !userRoles.includes("root")
+        ) {
+          throw new Error("Insufficient permissions to modify root users");
         }
 
-        // Agregar nuevas membresías
-        for (const teamId of teamsToAdd) {
-          await teams.createMembership(
-            teamId,
-            [],
-            email || currentProfile.email
-          );
+        // Solo admin+ puede modificar roles admin
+        if (
+          (targetRoles.includes("admin") || newRoles.includes("admin")) &&
+          !userRoles.includes("root") &&
+          !userRoles.includes("admin")
+        ) {
+          throw new Error("Insufficient permissions to modify admin users");
+        }
+
+        // Ops solo puede modificar drivers
+        if (
+          userRoles.includes("ops") &&
+          !userRoles.includes("admin") &&
+          !userRoles.includes("root")
+        ) {
+          if (
+            !targetRoles.every((role) => role === "driver") ||
+            !newRoles.every((role) => role === "driver")
+          ) {
+            throw new Error("Ops can only modify driver users");
+          }
         }
       }
 
+      // Filtrar campos según permisos
+      const allowedFields = [];
+
+      if (isOwnProfile) {
+        allowedFields.push(
+          "displayName",
+          "avatarUrl",
+          "licenseNumber",
+          "licenseExpiry",
+          "licenseClass"
+        );
+      }
+
+      if (
+        userRoles.includes("root") ||
+        userRoles.includes("admin") ||
+        (userRoles.includes("ops") &&
+          targetRoles.every((role) => role === "driver"))
+      ) {
+        allowedFields.push("enabled", "roles", "companies");
+      }
+
+      const filteredUpdates = Object.keys(updates)
+        .filter((key) => allowedFields.includes(key))
+        .reduce((obj, key) => {
+          obj[key] = updates[key];
+          return obj;
+        }, {});
+
+      if (Object.keys(filteredUpdates).length === 0) {
+        throw new Error("No valid fields to update");
+      }
+
+      // Agregar timestamp de actualización
+      filteredUpdates.updatedAt = new Date().toISOString();
+
+      // Actualizar el documento
+      const updatedProfile = await db.updateDocument({
+        databaseId: env.DB_ID,
+        collectionId: env.COLLECTION_USERS_PROFILE_ID,
+        documentId: targetProfile.$id,
+        data: filteredUpdates,
+      });
+
+      console.log("[USERS] User updated successfully");
       return updatedProfile;
     } catch (error) {
       console.error("[USERS] Error updating user:", error);
-      throw new Error(error.message || "Error al actualizar usuario");
+      throw new Error(`Error updating user: ${error.message}`);
     }
   },
 
-  // Cambiar contraseña de usuario
-  async changeUserPassword(userId, newPassword) {
+  // Eliminar usuario
+  async deleteUser(userId) {
     try {
-      const { changePasswordOnServer } = await import("./admin");
-      return await changePasswordOnServer(userId, newPassword);
-    } catch (error) {
-      console.error("[USERS] Error changing password:", error);
-      throw new Error(error.message || "Error al cambiar contraseña");
-    }
-  },
-
-  // Habilitar/Deshabilitar usuario
-  async toggleUserStatus(userId, enabled) {
-    try {
-      const profiles = await db.listDocuments(
-        env.DB_ID,
-        env.COLLECTION_USERS_PROFILE_ID,
-        [Query.equal("userId", userId)]
-      );
-
-      if (profiles.documents.length === 0) {
-        throw new Error("Usuario no encontrado");
+      // Verificar permisos del usuario actual
+      const currentUserProfile = await authService.getUserProfile();
+      if (!currentUserProfile) {
+        throw new Error("User profile not found");
       }
 
-      const profile = profiles.documents[0];
+      const userRoles = currentUserProfile.roles || [];
+      const canDeleteUsers =
+        userRoles.includes("root") || userRoles.includes("admin");
 
-      return await db.updateDocument(
-        env.DB_ID,
-        env.COLLECTION_USERS_PROFILE_ID,
-        profile.$id,
-        {
-          enabled,
-          updatedAt: new Date().toISOString(),
-        }
-      );
+      if (!canDeleteUsers) {
+        throw new Error(
+          "Access denied. Insufficient privileges to delete users."
+        );
+      }
+
+      // Buscar el perfil del usuario objetivo
+      const targetResponse = await db.listDocuments({
+        databaseId: env.DB_ID,
+        collectionId: env.COLLECTION_USERS_PROFILE_ID,
+        queries: [Query.equal("userId", userId), Query.limit(1)],
+      });
+
+      if (targetResponse.documents.length === 0) {
+        throw new Error("Target user profile not found");
+      }
+
+      const targetProfile = targetResponse.documents[0];
+      const targetRoles = targetProfile.roles || [];
+
+      // Solo root puede eliminar otros roots
+      if (targetRoles.includes("root") && !userRoles.includes("root")) {
+        throw new Error("Insufficient permissions to delete root users");
+      }
+
+      // Prevenir auto-eliminación
+      if (currentUserProfile.userId === userId) {
+        throw new Error("Cannot delete your own account");
+      }
+
+      // Eliminar perfil (nota: eliminar usuario de Auth requiere API server-side)
+      await db.deleteDocument({
+        databaseId: env.DB_ID,
+        collectionId: env.COLLECTION_USERS_PROFILE_ID,
+        documentId: targetProfile.$id,
+      });
+
+      console.log("[USERS] User profile deleted successfully");
+      return { success: true, message: "User profile deleted successfully" };
     } catch (error) {
-      console.error("[USERS] Error toggling user status:", error);
-      throw new Error(error.message || "Error al cambiar estado del usuario");
+      console.error("[USERS] Error deleting user:", error);
+      throw new Error(`Error deleting user: ${error.message}`);
     }
   },
 
-  // Eliminar usuario (soft delete - deshabilitar)
-  async deleteUser(userId) {
-    return await this.toggleUserStatus(userId, false);
-  },
+  // Obtener roles disponibles según permisos del usuario actual
+  async getAvailableRoles() {
+    try {
+      const currentUserProfile = await authService.getUserProfile();
+      if (!currentUserProfile) {
+        return [];
+      }
 
-  // Obtener teams disponibles según permisos
-  getAvailableTeams(currentUserRole) {
-    const allTeams = [
-      { id: env.TEAM_ADMINS_ID, name: "Administradores", value: "admin" },
-      { id: env.TEAM_OPS_ID, name: "Operaciones", value: "ops" },
-      { id: env.TEAM_DRIVERS_ID, name: "Conductores", value: "driver" },
-    ];
+      const userRoles = currentUserProfile.roles || [];
+      const availableRoles = [];
 
-    if (currentUserRole === "admin") {
-      return allTeams;
-    } else if (currentUserRole === "ops") {
-      return allTeams.filter((team) => team.value === "driver");
+      // Root puede asignar cualquier rol
+      if (userRoles.includes("root")) {
+        availableRoles.push(
+          {
+            value: "root",
+            label: "Root",
+            description: "Acceso total al sistema",
+          },
+          {
+            value: "admin",
+            label: "Administrador",
+            description: "Gestión completa de recursos",
+          },
+          {
+            value: "ops",
+            label: "Operaciones",
+            description: "Gestión operativa",
+          },
+          {
+            value: "driver",
+            label: "Conductor",
+            description: "Acceso de conductor",
+          }
+        );
+      }
+      // Admin puede asignar admin, ops y driver
+      else if (userRoles.includes("admin")) {
+        availableRoles.push(
+          {
+            value: "admin",
+            label: "Administrador",
+            description: "Gestión completa de recursos",
+          },
+          {
+            value: "ops",
+            label: "Operaciones",
+            description: "Gestión operativa",
+          },
+          {
+            value: "driver",
+            label: "Conductor",
+            description: "Acceso de conductor",
+          }
+        );
+      }
+      // Ops solo puede asignar driver
+      else if (userRoles.includes("ops")) {
+        availableRoles.push({
+          value: "driver",
+          label: "Conductor",
+          description: "Acceso de conductor",
+        });
+      }
+
+      return availableRoles;
+    } catch (error) {
+      console.error("[USERS] Error getting available roles:", error);
+      return [];
     }
-
-    return [];
   },
 };
 

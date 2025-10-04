@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   User,
   Mail,
@@ -7,14 +7,10 @@ import {
   Edit2,
   Save,
   X,
-  Upload,
-  Camera,
-  Download,
-  Eye,
   Shield,
   Settings,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import Card, {
   CardContent,
@@ -24,10 +20,10 @@ import Card, {
 import Button from "../../components/common/Button";
 import Input from "../../components/common/Input";
 import StatusBadge from "../../components/common/StatusBadge";
-import ImageViewer from "../../components/common/ImageViewer";
 import AvatarUploader from "../../components/common/AvatarUploader";
 import DriverLicenseUploader from "../../components/common/DriverLicenseUploader";
 import { useAuth } from "../../hooks/useAuth";
+import { useNotifications } from "../../components/common/NotificationSystem";
 import {
   getUserDriverLicense,
   createDriverLicenseRecord,
@@ -35,46 +31,39 @@ import {
 } from "../../api/storage";
 import { formatters } from "../../utils";
 
+// Constantes
+const PHONE_REGEX = /^\+\d{1,4}\d{7,15}$/;
+const PHONE_ERROR_MESSAGE =
+  "Formato inválido. Usa +[código país][número] (ej: +523221234567)";
+
 const Profile = () => {
   const { user, updateUser, updateProfile, isAdmin, isDriver } = useAuth();
+  const { addNotification } = useNotifications();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [imageViewerOpen, setImageViewerOpen] = useState(false);
-  const [viewerImages, setViewerImages] = useState([]);
-  const [notification, setNotification] = useState(null);
   const [driverLicense, setDriverLicense] = useState(null);
-  const [loadingLicense, setLoadingLicense] = useState(false);
-  const [activeTab, setActiveTab] = useState("personal");
   const [phoneError, setPhoneError] = useState("");
 
-  // Función para validar teléfono
-  const validatePhone = (phone) => {
-    if (!phone) {
+  // Validación de teléfono optimizada
+  const validatePhone = useCallback((phone) => {
+    if (!phone?.trim()) {
       setPhoneError("");
       return true;
     }
 
-    const phonePattern = /^\+\d{1,3}\d{10,14}$/;
-    const isValid = phonePattern.test(phone);
+    const isValid = PHONE_REGEX.test(phone.trim());
+    setPhoneError(isValid ? "" : PHONE_ERROR_MESSAGE);
+    return isValid;
+  }, []);
 
-    if (!isValid) {
-      setPhoneError(
-        "Formato inválido. Usa +[código país][número] (ej: +523221234567)"
-      );
-      return false;
-    }
-
-    setPhoneError("");
-    return true;
-  };
-
-  const [formData, setFormData] = useState({
+  // Estado del formulario inicializado con datos del usuario
+  const [formData, setFormData] = useState(() => ({
     displayName: user?.profile?.displayName || "",
     phone: user?.phone || "",
     licenseNumber: user?.profile?.licenseNumber || "",
     licenseExpiry: user?.profile?.licenseExpiry || "",
     licenseClass: user?.profile?.licenseClass || "B",
-  });
+  }));
 
   useEffect(() => {
     if (isDriver) {
@@ -82,109 +71,117 @@ const Profile = () => {
     }
   }, [isDriver, user?.$id]);
 
-  const showNotification = (message, type = "success") => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 5000);
-  };
+  // Notificaciones ahora se manejan directamente con addNotification
 
-  const loadDriverLicense = async () => {
+  // Carga de licencia de conductor optimizada
+  const loadDriverLicense = useCallback(async () => {
     if (!user?.$id) return;
 
     try {
-      setLoadingLicense(true);
       const license = await getUserDriverLicense(user.$id);
       setDriverLicense(license);
     } catch (error) {
-      console.error("Failed to load driver license:", error);
-    } finally {
-      setLoadingLicense(false);
+      // Solo log crítico, la ausencia de licencia no es un error
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error loading driver license:", error.message);
+      }
     }
-  };
+  }, [user?.$id]);
 
-  const handleDeleteLicenseImage = async (imageIndex, imageData) => {
-    if (!driverLicense || !user?.$id) return;
+  // Manejo optimizado de eliminación de imágenes
+  const handleDeleteLicenseImage = useCallback(
+    async (imageIndex, imageData) => {
+      if (!driverLicense?.$id) return;
 
-    try {
       const licenseType = imageIndex === 0 ? "front" : "back";
-      const fieldToUpdate =
-        licenseType === "front" ? "frontFileUrl" : "backFileUrl";
+      const updateData = {
+        [licenseType === "front" ? "frontImageUrl" : "backImageUrl"]: null,
+      };
 
-      // Actualizar la licencia para remover la URL de la imagen
-      const updateData = {};
-      if (licenseType === "front") {
-        updateData.frontImageUrl = null; // Para la función updateDriverLicenseImages
-      } else {
-        updateData.backImageUrl = null; // Para la función updateDriverLicenseImages
-      }
+      try {
+        await updateDriverLicenseImages(driverLicense.$id, updateData);
 
-      const updatedLicense = await updateDriverLicenseImages(
-        driverLicense.$id,
-        updateData
-      );
-
-      setDriverLicense(updatedLicense);
-      showNotification(
-        `Imagen ${
-          licenseType === "front" ? "frontal" : "trasera"
-        } eliminada correctamente`
-      );
-
-      // Recargar licencia después de un momento
-      setTimeout(() => {
-        loadDriverLicense();
-      }, 500);
-    } catch (error) {
-      console.error("Error deleting license image:", error);
-      showNotification("Error al eliminar la imagen", "error");
-    }
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    // Limpiar error de teléfono al escribir
-    if (name === "phone" && phoneError) {
-      setPhoneError("");
-    }
-  };
-
-  const handlePhoneBlur = (e) => {
-    validatePhone(e.target.value);
-  };
-
-  const handleSave = async () => {
-    setIsLoading(true);
-    try {
-      // Validar teléfono antes de guardar
-      if (formData.phone && !validatePhone(formData.phone)) {
-        setNotification({
-          type: "error",
-          title: "Error de validación",
-          message: "El formato del teléfono es inválido",
+        addNotification({
+          title: "🗑️ Imagen eliminada",
+          message: `Imagen ${
+            licenseType === "front" ? "frontal" : "trasera"
+          } eliminada correctamente`,
+          type: "success",
+          duration: 3000,
         });
-        setIsLoading(false);
-        return;
-      }
 
-      // Separar datos de usuario (Appwrite Auth) y perfil (Database)
+        // Recargar licencia
+        await loadDriverLicense();
+      } catch (error) {
+        addNotification({
+          title: "❌ Error al eliminar",
+          message: "No se pudo eliminar la imagen. Inténtalo nuevamente.",
+          type: "error",
+          duration: 5000,
+        });
+
+        if (process.env.NODE_ENV === "development") {
+          console.error("Error deleting license image:", error);
+        }
+      }
+    },
+    [driverLicense?.$id, loadDriverLicense, addNotification]
+  );
+
+  // Manejo optimizado de cambios en inputs
+  const handleInputChange = useCallback(
+    (e) => {
+      const { name, value } = e.target;
+
+      setFormData((prev) => ({ ...prev, [name]: value }));
+
+      // Limpiar error de teléfono al escribir
+      if (name === "phone" && phoneError) {
+        setPhoneError("");
+      }
+    },
+    [phoneError]
+  );
+
+  // Validación de teléfono al perder foco
+  const handlePhoneBlur = useCallback(
+    (e) => {
+      validatePhone(e.target.value);
+    },
+    [validatePhone]
+  );
+
+  // Guardado optimizado del perfil
+  const handleSave = useCallback(async () => {
+    // Validar teléfono antes de guardar
+    if (formData.phone && !validatePhone(formData.phone)) {
+      addNotification({
+        title: "❌ Error de validación",
+        message: "El formato del teléfono es inválido",
+        type: "error",
+        duration: 4000,
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const updatePromises = [];
+
+      // Datos para Appwrite Auth
       const userData = {};
+      if (formData.displayName?.trim() && formData.displayName !== user.name) {
+        userData.name = formData.displayName.trim();
+      }
+      if (formData.phone?.trim() && formData.phone !== user.phone) {
+        userData.phone = formData.phone.trim();
+      }
+
+      // Datos para perfil en DB
       const profileData = {};
-
-      // Campos que van al User de Appwrite
-      if (formData.displayName && formData.displayName !== user.name) {
-        userData.name = formData.displayName;
-      }
-      if (formData.phone && formData.phone !== user.phone) {
-        userData.phone = formData.phone;
-      }
-
-      // Campos que van al perfil de la base de datos
-      if (formData.licenseNumber) {
-        profileData.licenseNumber = formData.licenseNumber;
+      if (formData.licenseNumber?.trim()) {
+        profileData.licenseNumber = formData.licenseNumber.trim();
       }
       if (formData.licenseExpiry) {
         profileData.licenseExpiry = formData.licenseExpiry;
@@ -193,27 +190,53 @@ const Profile = () => {
         profileData.licenseClass = formData.licenseClass;
       }
 
-      // Actualizar usuario si hay cambios
+      // Ejecutar actualizaciones en paralelo
       if (Object.keys(userData).length > 0) {
-        await updateUser(userData);
+        updatePromises.push(updateUser(userData));
+      }
+      if (Object.keys(profileData).length > 0) {
+        updatePromises.push(updateProfile(profileData));
       }
 
-      // Actualizar perfil si hay cambios
-      if (Object.keys(profileData).length > 0) {
-        await updateProfile(profileData);
+      if (updatePromises.length === 0) {
+        setIsEditing(false);
+        return;
       }
+
+      await Promise.all(updatePromises);
 
       setIsEditing(false);
-      showNotification("Información actualizada correctamente", "success");
+      addNotification({
+        title: "✅ Perfil actualizado",
+        message: "Tu información se ha guardado exitosamente",
+        type: "success",
+        duration: 4000,
+      });
     } catch (error) {
-      console.error("Error updating profile:", error);
-      showNotification("Error al actualizar la información", "error");
+      addNotification({
+        title: "❌ Error al guardar",
+        message: error.message || "No se pudo actualizar la información",
+        type: "error",
+        duration: 5000,
+      });
+
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error updating profile:", error);
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [
+    formData,
+    user,
+    validatePhone,
+    updateUser,
+    updateProfile,
+    addNotification,
+  ]);
 
-  const handleCancel = () => {
+  // Cancelar edición y resetear formulario
+  const handleCancel = useCallback(() => {
     setFormData({
       displayName: user?.profile?.displayName || "",
       phone: user?.phone || "",
@@ -222,125 +245,160 @@ const Profile = () => {
       licenseClass: user?.profile?.licenseClass || "B",
     });
     setIsEditing(false);
-  };
+    setPhoneError("");
+  }, [user]);
 
-  const handleAvatarUpload = async (avatarData) => {
-    try {
-      await updateProfile({
-        avatarUrl: avatarData.avatarUrl,
+  // Manejo optimizado de carga de avatar
+  const handleAvatarUpload = useCallback(
+    async (avatarData) => {
+      try {
+        await updateProfile({ avatarUrl: avatarData.avatarUrl });
+
+        addNotification({
+          title: "📸 Avatar actualizado",
+          message: "Tu foto de perfil se ha actualizado exitosamente",
+          type: "success",
+          duration: 4000,
+        });
+      } catch (error) {
+        addNotification({
+          title: "❌ Error de avatar",
+          message: "No se pudo actualizar tu foto de perfil",
+          type: "error",
+          duration: 5000,
+        });
+
+        if (process.env.NODE_ENV === "development") {
+          console.error("Error updating avatar:", error);
+        }
+      }
+    },
+    [updateProfile, addNotification]
+  );
+
+  // Manejo de errores de avatar
+  const handleAvatarError = useCallback(
+    (error) => {
+      addNotification({
+        title: "🖼️ Error de avatar",
+        message: typeof error === "string" ? error : "Error al subir la imagen",
+        type: "error",
+        duration: 6000,
       });
-      showNotification("Avatar actualizado correctamente", "success");
-    } catch (error) {
-      console.error("Error updating avatar:", error);
-      showNotification("Error al actualizar el avatar", "error");
-    }
-  };
+    },
+    [addNotification]
+  );
 
-  const handleAvatarError = (error) => {
-    showNotification(error, "error");
-  };
-
-  const handleLicenseUpload = async (licenseData, licenseType) => {
-    if (!user?.$id) return;
-
-    try {
-      // Si no existe registro de licencia, crearlo
-      if (!driverLicense) {
-        const licenseDataForRecord = {};
-
-        // Asignar la URL de imagen al campo correspondiente según el tipo
-        if (licenseType === "front") {
-          licenseDataForRecord.frontImageUrl = licenseData.licenseUrl;
-        } else if (licenseType === "back") {
-          licenseDataForRecord.backImageUrl = licenseData.licenseUrl;
-        }
-
-        const newLicense = await createDriverLicenseRecord(
-          user.$id,
-          licenseDataForRecord
-        );
-
-        console.log("[PROFILE] New license created:", newLicense);
-        setDriverLicense(newLicense);
-
-        // Forzar re-render del componente
-        setTimeout(() => {
-          loadDriverLicense();
-        }, 500);
-      } else {
-        // Actualizar registro existente
-        const updateData = {};
-
-        // Asignar la URL de imagen al campo correspondiente según el tipo
-        if (licenseType === "front") {
-          updateData.frontImageId = licenseData.fileId; // Para referencia interna
-          updateData.frontImageUrl = licenseData.licenseUrl; // Para la función de update
-        } else if (licenseType === "back") {
-          updateData.backImageId = licenseData.fileId; // Para referencia interna
-          updateData.backImageUrl = licenseData.licenseUrl; // Para la función de update
-        }
-
-        const updatedLicense = await updateDriverLicenseImages(
-          driverLicense.$id,
-          updateData
-        );
-
-        console.log("[PROFILE] License updated:", updatedLicense);
-        setDriverLicense(updatedLicense);
-
-        // Forzar re-render del componente
-        setTimeout(() => {
-          loadDriverLicense();
-        }, 500);
+  // Manejo optimizado de carga de licencia
+  const handleLicenseUpload = useCallback(
+    async (licenseData, licenseType) => {
+      if (!user?.$id || !licenseData?.fileUrl) {
+        addNotification({
+          title: "❌ Error de validación",
+          message: "Datos de imagen inválidos",
+          type: "error",
+          duration: 4000,
+        });
+        return;
       }
 
-      showNotification(
-        `Imagen ${
-          licenseType === "front" ? "frontal" : "trasera"
-        } de licencia subida correctamente`,
-        "success"
-      );
-    } catch (error) {
-      console.error("Error uploading license:", error);
-      showNotification("Error al subir la imagen de licencia", "error");
-    }
-  };
+      const imageUrl = licenseData.fileUrl;
+      const fieldName = `${licenseType}FileUrl`;
 
-  const handleLicenseError = (error) => {
-    showNotification(error, "error");
-  };
+      try {
+        let result;
 
-  // Determinar rol para mostrar
-  const getUserRoleLabel = () => {
-    if (isAdmin) {
-      return "Administrador";
-    }
-    if (isDriver) {
-      return "Conductor";
-    }
+        if (!driverLicense) {
+          // Crear nuevo registro de licencia
+          result = await createDriverLicenseRecord(user.$id, {
+            [fieldName]: imageUrl,
+          });
+        } else {
+          // Actualizar registro existente
+          result = await updateDriverLicenseImages(driverLicense.$id, {
+            [fieldName]: imageUrl,
+          });
+        }
+
+        setDriverLicense(result);
+
+        addNotification({
+          title: "🎆 Licencia actualizada",
+          message: `Imagen ${
+            licenseType === "front" ? "frontal" : "trasera"
+          } subida correctamente`,
+          type: "success",
+          duration: 4000,
+        });
+
+        // Recargar licencia para asegurar sincronización
+        await loadDriverLicense();
+      } catch (error) {
+        const errorMessage = error.message || "Error desconocido";
+
+        addNotification({
+          title: "📷 Error al subir licencia",
+          message: `No se pudo subir la imagen ${
+            licenseType === "front" ? "frontal" : "trasera"
+          }: ${errorMessage}`,
+          type: "error",
+          duration: 8000,
+        });
+
+        if (process.env.NODE_ENV === "development") {
+          console.error("License upload error:", {
+            error: errorMessage,
+            licenseType,
+            imageUrl,
+          });
+        }
+      }
+    },
+    [user?.$id, driverLicense, addNotification, loadDriverLicense]
+  );
+
+  // Manejo de errores de licencia
+  const handleLicenseError = useCallback(
+    (error) => {
+      addNotification({
+        title: "🚫 Error de imagen",
+        message:
+          typeof error === "string" ? error : "Error al procesar la imagen",
+        type: "error",
+        duration: 8000,
+      });
+    },
+    [addNotification]
+  );
+
+  // Rol del usuario optimizado con memoización
+  const userRoleLabel = useMemo(() => {
+    if (isAdmin) return "Administrador";
+    if (isDriver) return "Conductor";
     return "Usuario";
-  };
+  }, [isAdmin, isDriver]);
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
+  // Variables de animación memoizadas
+  const animationVariants = useMemo(
+    () => ({
+      container: {
+        hidden: { opacity: 0 },
+        visible: {
+          opacity: 1,
+          transition: { staggerChildren: 0.1 },
+        },
       },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.3,
+      item: {
+        hidden: { opacity: 0, y: 20 },
+        visible: {
+          opacity: 1,
+          y: 0,
+          transition: { duration: 0.3 },
+        },
       },
-    },
-  };
+    }),
+    []
+  );
 
   if (!user) {
     return (
@@ -356,37 +414,14 @@ const Profile = () => {
   return (
     <motion.div
       className="max-w-6xl mx-auto space-y-6"
-      variants={containerVariants}
+      variants={animationVariants.container}
       initial="hidden"
       animate="visible"
     >
-      {/* Notification */}
-      <AnimatePresence>
-        {notification && (
-          <motion.div
-            className={`p-4 rounded-lg border ${
-              notification.type === "success"
-                ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200"
-                : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200"
-            }`}
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
-            <div className="flex items-center gap-2">
-              {notification.type === "success" ? (
-                <Shield className="w-5 h-5" />
-              ) : (
-                <X className="w-5 h-5" />
-              )}
-              {notification.message}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Las notificaciones ahora se muestran como toast globales */}
 
       {/* Header - Solo visible en desktop para evitar duplicación con Navbar en móvil */}
-      <motion.div variants={itemVariants} className="hidden sm:block">
+      <motion.div variants={animationVariants.item} className="hidden sm:block">
         <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
           <div className="min-w-0 flex-1">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate">
@@ -441,7 +476,7 @@ const Profile = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Información Principal */}
-        <motion.div className="lg:col-span-2" variants={itemVariants}>
+        <motion.div className="lg:col-span-2" variants={animationVariants.item}>
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -500,7 +535,7 @@ const Profile = () => {
                     {user?.profile?.displayName || user.name}
                   </h3>
                   <p className="text-gray-600 dark:text-gray-300 mb-2">
-                    {getUserRoleLabel()}
+                    {userRoleLabel}
                   </p>
                   <StatusBadge
                     status={user.profile?.enabled ? "active" : "cancelled"}
@@ -770,7 +805,7 @@ const Profile = () => {
         </motion.div>
 
         {/* Panel lateral */}
-        <motion.div className="space-y-6" variants={itemVariants}>
+        <motion.div className="space-y-6" variants={animationVariants.item}>
           {/* Estadísticas rápidas */}
           <Card>
             <CardHeader>
@@ -793,7 +828,7 @@ const Profile = () => {
                   Rol
                 </span>
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  {getUserRoleLabel()}
+                  {userRoleLabel}
                 </span>
               </div>
 
@@ -915,17 +950,7 @@ const Profile = () => {
         </motion.div>
       </div>
 
-      {/* Image Viewer para licencias */}
-      <AnimatePresence>
-        {imageViewerOpen && (
-          <ImageViewer
-            isOpen={imageViewerOpen}
-            onClose={() => setImageViewerOpen(false)}
-            images={viewerImages}
-            currentIndex={0}
-          />
-        )}
-      </AnimatePresence>
+      {/* Image Viewer removido - no se utiliza en esta versión optimizada */}
     </motion.div>
   );
 };

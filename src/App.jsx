@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
+import { useRoles } from "./hooks/useRoles";
 
 // Layouts
 import AppLayout from "./components/layout/AppLayout";
@@ -22,11 +23,36 @@ import DriverDashboard from "./pages/driver/Dashboard";
 import Protected from "./components/Protected";
 import PublicOnly from "./components/PublicOnly";
 
-// Componente para redirección inicial
+// Componente para redirección inicial - optimizado
 const RedirectToUserDashboard = () => {
-  const { isAdmin, isDriver } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const {
+    primaryRole: role,
+    isRoot,
+    isAdmin,
+    isOps,
+    isDriver,
+    isLoading: roleLoading,
+  } = useRoles();
 
-  if (isAdmin) {
+  // Mostrar loader mientras se determinan los roles
+  if (authLoading || roleLoading || !user) {
+    return null; // El componente Protected ya maneja el loading
+  }
+
+  // Debug solo ocasionalmente
+  if (process.env.NODE_ENV === "development" && Math.random() < 0.1) {
+    console.log("[REDIRECT] Redirecting user with role:", role, {
+      isRoot,
+      isAdmin,
+      isOps,
+      isDriver,
+    });
+  }
+
+  if (isRoot || isAdmin) {
+    return <Navigate to="/admin" replace />;
+  } else if (isOps) {
     return <Navigate to="/admin" replace />;
   } else if (isDriver) {
     return <Navigate to="/driver" replace />;

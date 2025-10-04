@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { db, teams } from "../lib/appwrite";
+import { db } from "../lib/appwrite";
 import { env } from "../lib/env";
 import { Query } from "appwrite";
 
 export const useAdminStats = () => {
-  // Consultar total de usuarios en el team de drivers
+  // Consultar total de usuarios con rol driver
   const {
     data: driversCount,
     isLoading: driversLoading,
@@ -13,8 +13,12 @@ export const useAdminStats = () => {
     queryKey: ["admin", "drivers-count"],
     queryFn: async () => {
       try {
-        const memberships = await teams.listMemberships(env.TEAM_DRIVERS_ID);
-        return memberships.total || 0;
+        const response = await db.listDocuments({
+          databaseId: env.DB_ID,
+          collectionId: env.COLLECTION_USERS_PROFILE_ID,
+          queries: [Query.contains("roles", "driver")],
+        });
+        return response.total || 0;
       } catch (error) {
         console.error("Error fetching drivers count:", error);
         return 0;
@@ -32,11 +36,11 @@ export const useAdminStats = () => {
     queryKey: ["admin", "users-count"],
     queryFn: async () => {
       try {
-        const response = await db.listDocuments(
-          env.DB_ID,
-          env.COLLECTION_USERS_PROFILE_ID,
-          [Query.limit(1)] // Solo necesitamos el total
-        );
+        const response = await db.listDocuments({
+          databaseId: env.DB_ID,
+          collectionId: env.COLLECTION_USERS_PROFILE_ID,
+          queries: [Query.limit(1)], // Solo necesitamos el total
+        });
         return response.total || 0;
       } catch (error) {
         console.error("Error fetching users count:", error);
@@ -55,11 +59,11 @@ export const useAdminStats = () => {
     queryKey: ["admin", "brands-count"],
     queryFn: async () => {
       try {
-        const response = await db.listDocuments(
-          env.DB_ID,
-          env.COLLECTION_BRANDS_ID,
-          [Query.limit(1)]
-        );
+        const response = await db.listDocuments({
+          databaseId: env.DB_ID,
+          collectionId: env.COLLECTION_BRANDS_ID,
+          queries: [Query.limit(1)],
+        });
         return response.total || 0;
       } catch (error) {
         console.error("Error fetching brands count:", error);
@@ -78,11 +82,11 @@ export const useAdminStats = () => {
     queryKey: ["admin", "models-count"],
     queryFn: async () => {
       try {
-        const response = await db.listDocuments(
-          env.DB_ID,
-          env.COLLECTION_MODELS_ID,
-          [Query.limit(1)]
-        );
+        const response = await db.listDocuments({
+          databaseId: env.DB_ID,
+          collectionId: env.COLLECTION_MODELS_ID,
+          queries: [Query.limit(1)],
+        });
         return response.total || 0;
       } catch (error) {
         console.error("Error fetching models count:", error);
@@ -101,11 +105,11 @@ export const useAdminStats = () => {
     queryKey: ["admin", "companies-count"],
     queryFn: async () => {
       try {
-        const response = await db.listDocuments(
-          env.DB_ID,
-          env.COLLECTION_COMPANIES_ID,
-          [Query.limit(1)]
-        );
+        const response = await db.listDocuments({
+          databaseId: env.DB_ID,
+          collectionId: env.COLLECTION_COMPANIES_ID,
+          queries: [Query.limit(1)],
+        });
         return response.total || 0;
       } catch (error) {
         console.error("Error fetching companies count:", error);
@@ -147,11 +151,11 @@ export const useRecentUsers = (limit = 5) => {
     queryKey: ["admin", "recent-users", limit],
     queryFn: async () => {
       try {
-        const response = await db.listDocuments(
-          env.DB_ID,
-          env.COLLECTION_USERS_PROFILE_ID,
-          [Query.orderDesc("$createdAt"), Query.limit(limit)]
-        );
+        const response = await db.listDocuments({
+          databaseId: env.DB_ID,
+          collectionId: env.COLLECTION_USERS_PROFILE_ID,
+          queries: [Query.orderDesc("$createdAt"), Query.limit(limit)],
+        });
         return response.documents || [];
       } catch (error) {
         console.error("Error fetching recent users:", error);
@@ -167,11 +171,11 @@ export const useRecentBrands = (limit = 5) => {
     queryKey: ["admin", "recent-brands", limit],
     queryFn: async () => {
       try {
-        const response = await db.listDocuments(
-          env.DB_ID,
-          env.COLLECTION_BRANDS_ID,
-          [Query.orderDesc("$createdAt"), Query.limit(limit)]
-        );
+        const response = await db.listDocuments({
+          databaseId: env.DB_ID,
+          collectionId: env.COLLECTION_BRANDS_ID,
+          queries: [Query.orderDesc("$createdAt"), Query.limit(limit)],
+        });
         return response.documents || [];
       } catch (error) {
         console.error("Error fetching recent brands:", error);

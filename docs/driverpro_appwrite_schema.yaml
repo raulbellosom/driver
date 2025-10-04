@@ -68,7 +68,7 @@ database:
           required: false
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: oneToMany,
               owning_side: false,
               inverse_of: companies,
@@ -109,12 +109,12 @@ database:
               inverse_of: usersProfile,
               on_delete: setNull,
             }
-        - {
-            name: isDriver,
-            type: boolean,
-            required: true,
-            default_supported: false,
-          } # Diferenciador Admin/Driver
+        - name: roles
+          type: string # string con enum
+          required: true
+          array: true # es un ARRAY de esos valores
+          constraints:
+            enum: [root, admin, ops, driver]
         - {
             name: licenseNumber,
             type: string,
@@ -147,7 +147,7 @@ database:
           required: true
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: manyToOne,
               owning_side: true,
               inverse_of: null,
@@ -599,7 +599,7 @@ database:
           required: true
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: manyToOne,
               owning_side: true,
               inverse_of: null,
@@ -685,7 +685,7 @@ database:
           required: false
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: manyToOne,
               owning_side: true,
               inverse_of: null,
@@ -737,7 +737,7 @@ database:
           required: true
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: manyToOne,
               owning_side: true,
               inverse_of: null,
@@ -856,7 +856,7 @@ database:
           required: true
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: manyToOne,
               owning_side: true,
               inverse_of: null,
@@ -1007,7 +1007,7 @@ database:
           required: false
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: manyToOne,
               owning_side: true,
               inverse_of: null,
@@ -1174,7 +1174,7 @@ database:
           required: true
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: manyToOne,
               owning_side: true,
               inverse_of: null,
@@ -1372,7 +1372,7 @@ database:
           required: false
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: manyToOne,
               owning_side: true,
               inverse_of: null,
@@ -1441,7 +1441,7 @@ database:
           required: false
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: manyToOne,
               owning_side: true,
               inverse_of: null,
@@ -1779,7 +1779,7 @@ database:
           required: false
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: manyToOne,
               owning_side: true,
               inverse_of: null,
@@ -1830,7 +1830,7 @@ database:
           required: true
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: manyToOne,
               owning_side: true,
               inverse_of: null,
@@ -1875,7 +1875,7 @@ database:
           required: false
           relationship:
             {
-              target: usersProfile,
+              target: users_profile,
               cardinality: manyToOne,
               owning_side: true,
               inverse_of: null,

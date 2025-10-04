@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import usersService from "../api/users";
-import { useRole } from "../hooks/useRole";
+import { useRoles } from "../hooks/useRoles";
 import { useNotifications } from "./common/NotificationSystem";
 import {
   X,
@@ -24,19 +24,17 @@ import { fetchCompanies } from "../api/crud";
 
 export default function CreateUserModal({ isOpen, onClose, onSuccess }) {
   const queryClient = useQueryClient();
-  const { role, can } = useRole();
+  const { primaryRole: role, can } = useRoles();
   const { addNotification } = useNotifications();
   const [showPassword, setShowPassword] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    phone: "",
     password: "",
     displayName: "",
-    isDriver: false,
     enabled: true,
-    teams: [],
+    roles: ["driver"], // Por defecto driver
     companyId: null,
   });
 
@@ -46,8 +44,11 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }) {
     queryFn: fetchCompanies,
   });
 
-  // Obtener teams disponibles según permisos
-  const availableTeams = usersService.getAvailableTeams(role);
+  // Query para obtener roles disponibles según permisos
+  const { data: availableRoles = [] } = useQuery({
+    queryKey: ["availableRoles"],
+    queryFn: usersService.getAvailableRoles,
+  });
 
   const createUserMutation = useMutation({
     mutationFn: usersService.createUser,
@@ -61,12 +62,10 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }) {
       setFormData({
         name: "",
         email: "",
-        phone: "",
         password: "",
         displayName: "",
-        isDriver: false,
         enabled: true,
-        teams: [],
+        roles: ["driver"],
         companyId: null,
       });
 
@@ -108,19 +107,10 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }) {
       return;
     }
 
-    if (formData.phone && !/^\+\d{12,15}$/.test(formData.phone)) {
+    if (formData.roles.length === 0) {
       addNotification({
         type: "error",
-        message:
-          "El teléfono debe tener el formato +523221234567 (incluyendo código de país)",
-      });
-      return;
-    }
-
-    if (formData.teams.length === 0) {
-      addNotification({
-        type: "error",
-        message: "Debe seleccionar al menos un team",
+        message: "Debe seleccionar al menos un rol",
       });
       return;
     }
@@ -132,22 +122,14 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleTeamToggle = (teamId) => {
+  const handleRoleToggle = (roleValue) => {
     setFormData((prev) => ({
       ...prev,
-      teams: prev.teams.includes(teamId)
-        ? prev.teams.filter((t) => t !== teamId)
-        : [...prev.teams, teamId],
+      roles: prev.roles.includes(roleValue)
+        ? prev.roles.filter((r) => r !== roleValue)
+        : [...prev.roles, roleValue],
     }));
   };
-
-  // Auto-establecer isDriver basado en teams seleccionados
-  useEffect(() => {
-    const hasDriverTeam = formData.teams.includes(
-      usersService.getAvailableTeams(role).find((t) => t.value === "driver")?.id
-    );
-    setFormData((prev) => ({ ...prev, isDriver: hasDriverTeam }));
-  }, [formData.teams, role]);
 
   return (
     <AnimatePresence>
@@ -236,31 +218,15 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }) {
                         />
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input
-                          label="Correo electrónico"
-                          leftIcon={<Mail />}
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) =>
-                            handleChange("email", e.target.value)
-                          }
-                          placeholder="juan@empresa.com"
-                          required
-                        />
-
-                        <Input
-                          label="Teléfono"
-                          leftIcon={<Phone />}
-                          type="tel"
-                          value={formData.phone}
-                          onChange={(e) =>
-                            handleChange("phone", e.target.value)
-                          }
-                          placeholder="+523221234567"
-                          hint="Formato: +[código país][número]"
-                        />
-                      </div>
+                      <Input
+                        label="Correo electrónico"
+                        leftIcon={<Mail />}
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => handleChange("email", e.target.value)}
+                        placeholder="juan@empresa.com"
+                        required
+                      />
 
                       <div className="relative">
                         <Input
@@ -319,17 +285,17 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }) {
                       </div>
                     )}
 
-                    {/* Teams y Roles */}
+                    {/* Roles */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center">
                         <Shield className="w-4 h-4 mr-2" />
-                        Teams y Roles *
+                        Roles del Usuario *
                       </h3>
 
                       <div className="space-y-3">
-                        {availableTeams.map((team, index) => (
+                        {availableRoles.map((role, index) => (
                           <motion.label
-                            key={team.id}
+                            key={role.value}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.3 + index * 0.1 }}
@@ -337,27 +303,22 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }) {
                           >
                             <input
                               type="checkbox"
-                              checked={formData.teams.includes(team.id)}
-                              onChange={() => handleTeamToggle(team.id)}
+                              checked={formData.roles.includes(role.value)}
+                              onChange={() => handleRoleToggle(role.value)}
                               className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-4"
                             />
                             <div className="flex-1">
                               <div className="flex items-center">
                                 <span className="font-medium text-gray-900 dark:text-white">
-                                  {team.name}
+                                  {role.label}
                                 </span>
                                 <Shield className="w-4 h-4 ml-2 text-gray-400" />
                               </div>
                               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                {team.value === "admin" &&
-                                  "Acceso completo al sistema"}
-                                {team.value === "ops" &&
-                                  "Gestión de operaciones y conductores"}
-                                {team.value === "driver" &&
-                                  "Acceso como conductor"}
+                                {role.description}
                               </p>
                             </div>
-                            {formData.teams.includes(team.id) && (
+                            {formData.roles.includes(role.value) && (
                               <CheckCircle className="w-5 h-5 text-green-500 ml-2" />
                             )}
                           </motion.label>
@@ -365,9 +326,9 @@ export default function CreateUserModal({ isOpen, onClose, onSuccess }) {
                       </div>
 
                       <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">
-                        💡 Un usuario puede pertenecer a múltiples teams. El rol
-                        principal se determinará por prioridad (Admin &gt; Ops
-                        &gt; Driver).
+                        💡 Un usuario puede tener múltiples roles. El sistema
+                        aplicará automáticamente la jerarquía: Root &gt; Admin
+                        &gt; Ops &gt; Driver.
                       </p>
                     </div>
 

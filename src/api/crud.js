@@ -90,11 +90,11 @@ export async function createCompany(data) {
 // Vehicle Brands CRUD (Task T5)
 export async function fetchVehicleBrands() {
   try {
-    const response = await db.listDocuments(
-      env.DB_ID,
-      env.COLLECTION_BRANDS_ID || "vehicle_brands",
-      []
-    );
+    const response = await db.listDocuments({
+      databaseId: env.DB_ID,
+      collectionId: env.COLLECTION_BRANDS_ID || "vehicle_brands",
+      queries: [],
+    });
     return response.documents;
   } catch (error) {
     throw new Error(`Error fetching brands: ${error.message}`);
@@ -128,11 +128,11 @@ export async function fetchVehicleModels(brandId = null) {
       queries.push(`brandId=${brandId}`);
     }
 
-    const response = await db.listDocuments(
-      env.DB_ID,
-      env.COLLECTION_MODELS_ID || "vehicle_models",
-      queries
-    );
+    const response = await db.listDocuments({
+      databaseId: env.DB_ID,
+      collectionId: env.COLLECTION_MODELS_ID || "vehicle_models",
+      queries: queries,
+    });
     return response.documents;
   } catch (error) {
     throw new Error(`Error fetching models: ${error.message}`);

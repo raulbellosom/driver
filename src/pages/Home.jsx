@@ -70,11 +70,11 @@ export default function Home() {
       try {
         console.log("[PING] Testing database service...");
         // Try to list documents (will fail with permissions but proves connection)
-        await db.listDocuments(
-          env.DB_ID,
-          env.COLLECTION_USERS_PROFILE_ID || "test",
-          []
-        );
+        await db.listDocuments({
+          databaseId: env.DB_ID,
+          collectionId: env.COLLECTION_USERS_PROFILE_ID || "test",
+          queries: [],
+        });
         results.database = true;
       } catch (error) {
         console.log("[PING] Database test:", error.message);

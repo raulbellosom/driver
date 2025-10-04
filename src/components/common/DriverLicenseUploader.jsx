@@ -40,10 +40,18 @@ const DriverLicenseUploader = ({
   const handleFileSelect = async (file) => {
     if (!file || disabled) return;
 
-    // Validar archivo
-    const validation = validateImageFile(file);
+    // Validar archivo con límite de 15MB
+    const validation = validateImageFile(file, 15 * 1024 * 1024);
     if (!validation.isValid) {
-      onError?.(validation.errors.join(", "));
+      const errorMessage = `❌ Error de validación:\n${validation.errors
+        .map((err) => `• ${err}`)
+        .join("\n")}`;
+      if (validation.fileInfo) {
+        const fileInfoMsg = `\n\nArchivo: ${validation.fileInfo.name} (${validation.fileInfo.sizeMB}MB, ${validation.fileInfo.type})`;
+        onError?.(errorMessage + fileInfoMsg);
+      } else {
+        onError?.(errorMessage);
+      }
       return;
     }
 
@@ -67,11 +75,41 @@ const DriverLicenseUploader = ({
         }
       );
 
+      console.log("[UPLOADER] Upload result:", result);
+      console.log("[UPLOADER] Calling onImageUploaded with:", {
+        result,
+        licenseType,
+      });
+
       onImageUploaded?.(result, licenseType);
       setPreview(null);
     } catch (error) {
       console.error(`License ${licenseType} upload failed:`, error);
-      onError?.(error.message);
+      let errorMessage = `❌ Error al subir la imagen ${
+        licenseType === "front" ? "frontal" : "trasera"
+      }:`;
+
+      if (error.message.includes("network")) {
+        errorMessage += "\n• Problema de conexión a internet";
+      } else if (error.message.includes("permission")) {
+        errorMessage += "\n• Sin permisos para subir archivos";
+      } else if (
+        error.message.includes("size") ||
+        error.message.includes("large")
+      ) {
+        errorMessage += "\n• El archivo es demasiado grande (máximo 15MB)";
+      } else if (
+        error.message.includes("type") ||
+        error.message.includes("format")
+      ) {
+        errorMessage += "\n• Formato de imagen no soportado";
+      } else {
+        errorMessage += `\n• ${error.message}`;
+      }
+
+      errorMessage +=
+        "\n\n💡 Intenta con una imagen más pequeña o diferente formato";
+      onError?.(errorMessage);
       setPreview(null);
     } finally {
       setUploading(false);
@@ -319,36 +357,56 @@ const DriverLicenseUploader = ({
 
                 <div className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                   <AlertCircle className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                  JPG, PNG, WebP (máx. 15MB)
+                  JPG, PNG, WebP, HEIC (máx. 15MB)
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Upload Progress */}
+          {/* Upload Progress - Centrado y mejorado */}
           <AnimatePresence>
             {uploading && (
               <motion.div
-                className="absolute inset-0 bg-white dark:bg-gray-800 bg-opacity-90 dark:bg-opacity-90 flex items-center justify-center rounded-xl"
+                className="absolute inset-0 bg-white dark:bg-gray-800 bg-opacity-95 dark:bg-opacity-95 flex items-center justify-center rounded-xl backdrop-blur-sm"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <div className="text-center">
-                  <div className="w-16 h-16 border-4 border-blue-500 dark:border-blue-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-                  <div className="text-lg font-medium text-blue-600 dark:text-blue-400 mb-2">
-                    Subiendo imagen...
+                <div className="text-center p-6">
+                  {/* Spinner centrado y más grande */}
+                  <div className="relative mx-auto mb-6">
+                    <div className="w-20 h-20 border-4 border-blue-200 dark:border-blue-800 rounded-full"></div>
+                    <div className="absolute top-0 left-0 w-20 h-20 border-4 border-blue-500 dark:border-blue-400 border-t-transparent rounded-full animate-spin"></div>
                   </div>
-                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                    {uploadProgress}%
-                  </div>
-                  <div className="w-32 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mt-4 mx-auto">
-                    <motion.div
-                      className="bg-blue-500 dark:bg-blue-400 h-2 rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${uploadProgress}%` }}
-                      transition={{ duration: 0.3 }}
-                    />
+
+                  {/* Texto mejorado */}
+                  <div className="space-y-3">
+                    <div className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                      📤 Subiendo imagen...
+                    </div>
+                    <div className="text-3xl font-bold text-blue-700 dark:text-blue-300">
+                      {uploadProgress}%
+                    </div>
+
+                    {/* Barra de progreso mejorada */}
+                    <div className="w-40 bg-gray-200 dark:bg-gray-600 rounded-full h-3 mx-auto overflow-hidden">
+                      <motion.div
+                        className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-400 dark:to-blue-500 h-full rounded-full flex items-center justify-end pr-1"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${uploadProgress}%` }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                      >
+                        {uploadProgress > 20 && (
+                          <div className="w-1 h-1 bg-white rounded-full"></div>
+                        )}
+                      </motion.div>
+                    </div>
+
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      {licenseType === "front"
+                        ? "Imagen frontal"
+                        : "Imagen trasera"}
+                    </div>
                   </div>
                 </div>
               </motion.div>

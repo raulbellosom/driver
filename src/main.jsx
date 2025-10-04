@@ -8,18 +8,23 @@ import { AuthProvider } from "./hooks/useAuth";
 import App from "./App";
 import "./index.css";
 
-// Configuración de React Query
+// Configuración optimizada de React Query
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutos
-      cacheTime: 10 * 60 * 1000, // 10 minutos
+      refetchOnMount: false,
+      refetchOnReconnect: false,
+      staleTime: 10 * 60 * 1000, // 10 minutos - más tiempo para evitar refetches
+      gcTime: 15 * 60 * 1000, // 15 minutos (antes cacheTime)
       retry: (failureCount, error) => {
         // No reintentar en errores de autenticación
-        if (error?.code === 401) return false;
-        return failureCount < 2;
+        if (error?.code === 401 || error?.status === 401) return false;
+        return failureCount < 1; // Solo un reintento
       },
+    },
+    mutations: {
+      retry: false, // No reintentar mutaciones por defecto
     },
   },
 });

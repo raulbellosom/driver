@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import usersService from "../api/users";
-import { useRole } from "../hooks/useRole";
+import { useRoles } from "../hooks/useRoles";
 import { useNotifications } from "./common/NotificationSystem";
 import Modal from "./common/Modal";
 import Input from "./common/Input";
@@ -21,17 +21,14 @@ import { fetchCompanies } from "../api/crud";
 
 export default function EditUserModal({ isOpen, onClose, user, onSuccess }) {
   const queryClient = useQueryClient();
-  const { role, can } = useRole();
+  const { primaryRole: role, can } = useRoles();
   const { addNotification } = useNotifications();
 
   const [formData, setFormData] = useState({
     name: "",
-    email: "",
-    phone: "",
     displayName: "",
-    isDriver: false,
     enabled: true,
-    teams: [],
+    roles: [],
     companyId: null,
     licenseNumber: "",
     licenseExpiry: "",
@@ -44,20 +41,20 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }) {
     queryFn: fetchCompanies,
   });
 
-  // Obtener teams disponibles según permisos
-  const availableTeams = usersService.getAvailableTeams(role);
+  // Query para obtener roles disponibles según permisos
+  const { data: availableRoles = [] } = useQuery({
+    queryKey: ["availableRoles"],
+    queryFn: usersService.getAvailableRoles,
+  });
 
   // Actualizar formulario cuando cambie el usuario
   useEffect(() => {
     if (user) {
       setFormData({
-        name: user.name || "",
-        email: user.email || "",
-        phone: user.phone || "",
+        name: user.displayName || user.name || "",
         displayName: user.displayName || "",
-        isDriver: user.isDriver || false,
         enabled: user.enabled ?? true,
-        teams: user.teams?.map((t) => t.id) || [],
+        roles: user.roles || [],
         companyId: user.companies?.$id || null,
         licenseNumber: user.licenseNumber || "",
         licenseExpiry: user.licenseExpiry || "",
@@ -104,31 +101,19 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }) {
       return;
     }
 
-    if (formData.phone && !/^\+\d{12,15}$/.test(formData.phone)) {
+    if (formData.roles.length === 0) {
       addNotification({
         type: "error",
-        message: "El teléfono debe tener el formato +523221234567",
-      });
-      return;
-    }
-
-    if (formData.teams.length === 0) {
-      addNotification({
-        type: "error",
-        message: "Debe seleccionar al menos un team",
+        message: "Debe seleccionar al menos un rol",
       });
       return;
     }
 
     // Preparar datos para actualización
     const updateData = {
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
       displayName: formData.displayName,
-      isDriver: formData.isDriver,
       enabled: formData.enabled,
-      teams: formData.teams,
+      roles: formData.roles,
       companyId: formData.companyId,
       licenseNumber: formData.licenseNumber,
       licenseExpiry: formData.licenseExpiry,
@@ -142,21 +127,14 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleTeamToggle = (teamId) => {
+  const handleRoleToggle = (roleValue) => {
     setFormData((prev) => ({
       ...prev,
-      teams: prev.teams.includes(teamId)
-        ? prev.teams.filter((t) => t !== teamId)
-        : [...prev.teams, teamId],
+      roles: prev.roles.includes(roleValue)
+        ? prev.roles.filter((r) => r !== roleValue)
+        : [...prev.roles, roleValue],
     }));
   };
-
-  // Auto-establecer isDriver basado en teams seleccionados
-  useEffect(() => {
-    const driverTeam = availableTeams.find((t) => t.value === "driver");
-    const hasDriverTeam = driverTeam && formData.teams.includes(driverTeam.id);
-    setFormData((prev) => ({ ...prev, isDriver: hasDriverTeam }));
-  }, [formData.teams, availableTeams]);
 
   if (!user) return null;
 
@@ -251,33 +229,30 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }) {
           </div>
         )}
 
-        {/* Teams / Roles */}
+        {/* Roles */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             <Shield className="w-4 h-4 inline mr-1" />
-            Teams y Roles *
+            Roles del Usuario *
           </label>
           <div className="space-y-2">
-            {availableTeams.map((team) => (
+            {availableRoles.map((role) => (
               <label
-                key={team.id}
+                key={role.value}
                 className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700 cursor-pointer"
               >
                 <input
                   type="checkbox"
-                  checked={formData.teams.includes(team.id)}
-                  onChange={() => handleTeamToggle(team.id)}
+                  checked={formData.roles.includes(role.value)}
+                  onChange={() => handleRoleToggle(role.value)}
                   className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <div>
                   <div className="font-medium text-gray-900 dark:text-white">
-                    {team.name}
+                    {role.label}
                   </div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {team.value === "admin" && "Acceso completo al sistema"}
-                    {team.value === "ops" &&
-                      "Gestión de operaciones y conductores"}
-                    {team.value === "driver" && "Acceso como conductor"}
+                    {role.description}
                   </div>
                 </div>
               </label>
@@ -285,8 +260,8 @@ export default function EditUserModal({ isOpen, onClose, user, onSuccess }) {
           </div>
         </div>
 
-        {/* Información de conductor (si es driver) */}
-        {formData.isDriver && (
+        {/* Información de conductor (si tiene rol driver) */}
+        {formData.roles.includes("driver") && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 dark:bg-green-900/20 dark:border-green-700">
             <h3 className="text-sm font-medium text-green-800 dark:text-green-200 mb-3">
               Información de Conductor

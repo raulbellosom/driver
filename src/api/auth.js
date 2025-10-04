@@ -1,50 +1,53 @@
-import { account, db, teams } from "../lib/appwrite";
+import { account, db } from "../lib/appwrite";
 import { env } from "../lib/env";
-import { Query, ID, Permission, Role } from "appwrite";
+import { Query, ID } from "appwrite";
 
 // ==========================================
-// AUTH SERVICE - Servicio centralizado de autenticación
+// AUTH SERVICE - Servicio centralizado de autenticación (sin teams)
 // ==========================================
 
 export const authService = {
   // Login con email y password
   async login(email, password) {
     try {
-      // Crear sesión
+      console.log("[AUTH] Attempting login for:", email);
+
       const session = await account.createEmailPasswordSession(email, password);
+      console.log("[AUTH] Login successful, session created");
 
-      // Obtener información completa del usuario
-      const userData = await authService.getCurrentUser();
+      // Obtener información del usuario y su perfil
+      const user = await authService.getCurrentUser();
+      console.log("[AUTH] User data loaded");
 
-      return {
-        session,
-        user: userData,
-      };
+      return user;
     } catch (error) {
       console.error("[AUTH] Login error:", error);
-      throw new Error(error.message || "Error al iniciar sesión");
+      throw new Error(error.message || "Error de credenciales");
     }
   },
 
   // Registro de nuevo usuario
   async register(userData) {
     try {
-      const { email, password, name, phone, isDriver = false } = userData;
+      const { name, email, password, role = "driver" } = userData;
 
-      // Crear usuario en Appwrite Auth
-      const user = await account.create("unique()", email, password, name);
+      console.log("[AUTH] Attempting registration for:", email);
+
+      const user = await account.create(ID.unique(), email, password, name);
+      console.log("[AUTH] User account created:", user.$id);
 
       // Crear sesión automáticamente
       await account.createEmailPasswordSession(email, password);
+      console.log("[AUTH] Session created for new user");
 
-      // Bootstrap del perfil (T2 requirement)
+      // Crear perfil automáticamente
       const profile = await authService.bootstrapUserProfile({
-        phone,
-        isDriver,
-        name: name || user.name,
+        name,
+        initialRole: role,
       });
 
-      return { user, profile };
+      console.log("[AUTH] Profile bootstrap completed");
+      return await authService.getCurrentUser();
     } catch (error) {
       console.error("[AUTH] Registration error:", error);
       throw new Error(error.message || "Error al crear la cuenta");
@@ -66,26 +69,28 @@ export const authService = {
   // Obtener usuario actual con toda la información
   async getCurrentUser() {
     try {
-      // Obtener usuario de Appwrite Auth
       const user = await account.get();
       if (!user) return null;
 
-      // Obtener teams del usuario
-      const userTeams = await authService.getUserTeams();
+      console.log("[AUTH] Getting current user:", user.$id);
 
-      // Obtener perfil extendido
+      // Obtener perfil del usuario desde DB (que incluye roles)
       const profile = await authService.getUserProfile();
+      console.log("[AUTH] User profile:", profile ? "found" : "not found");
+      console.log("[AUTH] User roles:", profile?.roles || []);
 
       return {
         ...user,
-        teams: userTeams,
-        profile,
+        profile: profile,
       };
     } catch (error) {
-      console.error("[AUTH] Get current user error:", error);
-      if (error.code === 401) {
-        return null; // Usuario no autenticado
+      // Si es error 401, el usuario no está autenticado
+      if (error.code === 401 || error.type === "general_unauthorized_scope") {
+        console.log("[AUTH] User not authenticated (401)");
+        return null;
       }
+
+      console.error("[AUTH] Error getting current user:", error);
       throw error;
     }
   },
@@ -100,24 +105,6 @@ export const authService = {
     }
   },
 
-  // Obtener teams del usuario
-  async getUserTeams() {
-    try {
-      const user = await account.get();
-      if (!user) return [];
-
-      // Obtener lista de teams del usuario actual
-      // teams.list() obtiene los teams donde el usuario actual es miembro
-      const teamsList = await teams.list();
-
-      console.log("[AUTH] User teams fetched:", teamsList);
-      return teamsList.teams || [];
-    } catch (error) {
-      console.error("[AUTH] Error getting user teams:", error);
-      return [];
-    }
-  },
-
   // Obtener perfil del usuario
   async getUserProfile() {
     try {
@@ -125,15 +112,17 @@ export const authService = {
       if (!user) throw new Error("No authenticated user");
 
       // Buscar profile por userId
-      const response = await db.listDocuments(
-        env.DB_ID,
-        env.COLLECTION_USERS_PROFILE_ID,
-        [Query.equal("userId", user.$id), Query.limit(1)]
-      );
+      const response = await db.listDocuments({
+        databaseId: env.DB_ID,
+        collectionId: env.COLLECTION_USERS_PROFILE_ID,
+        queries: [Query.equal("userId", user.$id), Query.limit(1)],
+      });
 
       if (response.documents.length === 0) {
         // Si no existe profile, crearlo automáticamente
-        console.log("[AUTH] No profile found, creating one...");
+        if (process.env.NODE_ENV === "development") {
+          console.log("[AUTH] No profile found, creating one...");
+        }
         return await authService.bootstrapUserProfile();
       }
 
@@ -144,81 +133,66 @@ export const authService = {
     }
   },
 
-  // Bootstrap del perfil de usuario (T2)
+  // Bootstrap del perfil de usuario (usando nuevo sistema de roles)
   async bootstrapUserProfile(additionalData = {}) {
     try {
       const user = await account.get();
       if (!user) throw new Error("No authenticated user");
 
       // Verificar si ya existe para evitar duplicados
-      const existingResponse = await db.listDocuments(
-        env.DB_ID,
-        env.COLLECTION_USERS_PROFILE_ID,
-        [Query.equal("userId", user.$id), Query.limit(1)]
-      );
+      const existingResponse = await db.listDocuments({
+        databaseId: env.DB_ID,
+        collectionId: env.COLLECTION_USERS_PROFILE_ID,
+        queries: [Query.equal("userId", user.$id), Query.limit(1)],
+      });
 
       if (existingResponse.documents.length > 0) {
         return existingResponse.documents[0];
       }
 
-      // Obtener teams del usuario para determinar permisos y rol
-      const userTeams = await authService.getUserTeams();
-      const userTeamIds = userTeams.map((team) => team.$id);
+      const { phone = null, name, initialRole = "driver" } = additionalData;
 
-      console.log("[AUTH] User teams:", userTeamIds);
-
-      // Determinar si es driver o admin basado en teams
-      const isInDriverTeam = userTeamIds.includes(env.TEAM_DRIVERS_ID);
-      const isInAdminTeam = userTeamIds.includes(env.TEAM_ADMINS_ID);
-
-      // Si está en team de drivers, es driver. Si está en admin, no es driver
-      const isDriver = isInDriverTeam;
-
-      const { phone = null, name } = additionalData;
+      // Determinar roles iniciales basado en el parámetro o por defecto driver
+      let initialRoles = ["driver"];
+      if (initialRole === "admin") {
+        initialRoles = ["admin"];
+      } else if (initialRole === "ops") {
+        initialRoles = ["ops"];
+      } else if (initialRole === "root") {
+        initialRoles = ["root"];
+      }
 
       const profileData = {
         userId: user.$id,
         displayName: name || user.name || user.email.split("@")[0],
         avatarUrl: null,
         companies: null, // Relación con companies
-        isDriver: isDriver,
+        roles: initialRoles, // Nuevo campo roles array
         licenseNumber: null,
         licenseExpiry: null,
+        licenseClass: null,
         enabled: true,
       };
 
-      console.log("[AUTH] Creating profile with data:", profileData);
-      console.log("[AUTH] User is driver:", isDriver, "Teams:", userTeamIds);
+      if (process.env.NODE_ENV === "development") {
+        console.log("[AUTH] Creating profile with data:", profileData);
+        console.log("[AUTH] Initial roles:", initialRoles);
+      }
 
-      // Crear permisos correctos:
-      // - El usuario siempre puede leer/actualizar su propio perfil
-      // - Los ADMINS pueden leer/actualizar TODOS los perfiles (siempre)
-      // - Los DRIVERS solo pueden ver su propio perfil
-      const permissions = [
-        Permission.read(Role.user(user.$id)),
-        Permission.update(Role.user(user.$id)),
-        // Los admins SIEMPRE pueden leer/actualizar cualquier perfil
-        Permission.read(Role.team(env.TEAM_ADMINS_ID)),
-        Permission.update(Role.team(env.TEAM_ADMINS_ID)),
-      ];
-
-      // IMPORTANTE: No agregar permisos de team drivers aquí
-      // Los drivers solo pueden ver su propio perfil (Permission.user ya cubre esto)      console.log("[AUTH] Permissions being set:", permissions);
-
-      // Crear documento con permisos
+      // Con el nuevo sistema, todos los usuarios tienen permisos AllUsers en Appwrite
+      // El control de permisos se hace por código usando el campo roles
       const profile = await db.createDocument({
         databaseId: env.DB_ID,
         collectionId: env.COLLECTION_USERS_PROFILE_ID,
         documentId: ID.unique(),
         data: profileData,
-        permissions: permissions,
       });
 
-      console.log("[AUTH] Profile created:", profile);
+      console.log("[AUTH] Profile created successfully:", profile.$id);
       return profile;
     } catch (error) {
-      console.error("[AUTH] Error creating profile:", error);
-      throw new Error(`Error creating user profile: ${error.message}`);
+      console.error("[AUTH] Error bootstrapping user profile:", error);
+      throw error;
     }
   },
 
@@ -257,215 +231,165 @@ export const authService = {
   // Actualizar perfil del usuario
   async updateProfile(updates) {
     try {
-      // Refrescar la sesión para obtener los permisos más actualizados
       const user = await account.get();
       if (!user) throw new Error("No authenticated user");
 
-      console.log("[AUTH] Current user session:", {
-        id: user.$id,
-        email: user.email,
-        name: user.name,
+      // Buscar el perfil del usuario
+      const response = await db.listDocuments({
+        databaseId: env.DB_ID,
+        collectionId: env.COLLECTION_USERS_PROFILE_ID,
+        queries: [Query.equal("userId", user.$id), Query.limit(1)],
       });
-
-      // Si se proporciona un userId específico en updates, usar ese (solo para admins)
-      // Si no, usar el userId del usuario actual
-      const targetUserId = updates.targetUserId || user.$id;
-
-      // Buscar el documento del perfil
-      const response = await db.listDocuments(
-        env.DB_ID,
-        env.COLLECTION_USERS_PROFILE_ID,
-        [Query.equal("userId", targetUserId), Query.limit(1)]
-      );
 
       if (response.documents.length === 0) {
         throw new Error("User profile not found");
       }
 
-      const profileId = response.documents[0].$id;
+      const currentProfile = response.documents[0];
+      const userRoles = currentProfile.roles || [];
+      const isOwnProfile = currentProfile.userId === user.$id;
 
-      // Verificar permisos ANTES de filtrar campos
-      const userTeams = await authService.getUserTeams();
-      const isUserAdmin = userTeams.some(
-        (team) => team.$id === env.TEAM_ADMINS_ID
-      );
-      const isOwnProfile = response.documents[0].userId === user.$id;
+      // Verificar permisos basado en roles
+      const isRoot = userRoles.includes("root");
+      const isAdmin = userRoles.includes("admin");
+      const isOps = userRoles.includes("ops");
+      const isDriver = userRoles.includes("driver");
 
-      // Definir campos permitidos según el contexto
-      const allowedFields = ["displayName", "avatarUrl"];
+      // Definir campos permitidos según los roles
+      const allowedFields = [];
 
-      // Si es driver, puede actualizar campos específicos
-      if (updates.isDriver || response.documents[0].isDriver) {
+      // Campos básicos que todos pueden actualizar en su propio perfil
+      if (isOwnProfile) {
+        allowedFields.push("displayName", "avatarUrl");
+      }
+
+      // Si es driver, puede actualizar campos específicos de licencia
+      if (isDriver && isOwnProfile) {
         allowedFields.push("licenseNumber", "licenseExpiry", "licenseClass");
       }
 
-      // Si es admin, puede actualizar campos adicionales
-      if (isUserAdmin) {
-        allowedFields.push("enabled", "isDriver");
+      // Si es ops o superior, puede actualizar campos adicionales
+      if (isOps || isAdmin || isRoot) {
+        allowedFields.push("companies");
       }
 
-      console.log("[AUTH] User permissions:", { isOwnProfile, isUserAdmin });
+      // Si es admin o root, puede actualizar campos críticos
+      if (isAdmin || isRoot) {
+        allowedFields.push("enabled", "roles");
+      }
+
+      console.log("[AUTH] User permissions:", { isOwnProfile, userRoles });
       console.log("[AUTH] Available fields for update:", allowedFields);
       console.log("[AUTH] Incoming updates:", updates);
 
-      // Filtrar solo campos permitidos
-      const filteredUpdates = {};
-      for (const [key, value] of Object.entries(updates)) {
-        if (key === "targetUserId") {
-          // Skip targetUserId, es solo para routing
-          continue;
-        }
+      // Filtrar actualizaciones por campos permitidos
+      const filteredUpdates = Object.keys(updates)
+        .filter((key) => allowedFields.includes(key))
+        .reduce((obj, key) => {
+          obj[key] = updates[key];
+          return obj;
+        }, {});
 
-        if (allowedFields.includes(key)) {
-          // Validar URL si es avatarUrl
-          if (key === "avatarUrl" && value) {
-            console.log("[AUTH] Avatar URL length:", value.length);
-            console.log(
-              "[AUTH] Avatar URL preview:",
-              value.substring(0, 100) + (value.length > 100 ? "..." : "")
-            );
-            // Verificar que la URL no tenga caracteres raros
-            if (typeof value !== "string") {
-              console.warn(
-                "[AUTH] Avatar URL is not a string:",
-                typeof value,
-                value
-              );
-              continue;
-            }
-          }
-          filteredUpdates[key] = value;
-        } else {
-          console.warn("[AUTH] Field not allowed for update:", key);
-        }
-      }
-
-      // Log debug info
-      console.log("[AUTH] Current user:", user.$id);
-      console.log(
-        "[AUTH] Profile document permissions:",
-        response.documents[0].$permissions
-      );
-      console.log("[AUTH] Allowed fields:", allowedFields);
       console.log("[AUTH] Filtered updates:", filteredUpdates);
-      console.log(
-        "[AUTH] Profile document owner:",
-        response.documents[0].userId
-      );
-      console.log("[AUTH] Document ID to update:", profileId);
-      console.log("[AUTH] Database ID:", env.DB_ID);
-      console.log("[AUTH] Collection ID:", env.COLLECTION_USERS_PROFILE_ID);
 
-      // Validar permisos finales
-      if (!isOwnProfile && !isUserAdmin) {
-        throw new Error("User not authorized to update this profile");
-      }
-
-      // Si se está actualizando el perfil de otro usuario, DEBE ser admin
-      if (targetUserId !== user.$id && !isUserAdmin) {
-        throw new Error("Only admins can update other users' profiles");
-      }
-
-      // Verificar que tenemos algo que actualizar
       if (Object.keys(filteredUpdates).length === 0) {
-        console.log("[AUTH] No valid fields to update");
-        return response.documents[0]; // Retornar el documento sin cambios
+        throw new Error(
+          "No valid fields to update or insufficient permissions"
+        );
       }
 
-      // Actualizar documento - intentar con permisos explícitos
-      try {
-        const updatedProfile = await db.updateDocument(
-          env.DB_ID,
-          env.COLLECTION_USERS_PROFILE_ID,
-          profileId,
-          filteredUpdates
-        );
-        console.log("[AUTH] Profile updated successfully:", updatedProfile);
-        return updatedProfile;
-      } catch (updateError) {
-        console.error("[AUTH] First update attempt failed:", updateError);
+      // Validar roles si se están actualizando
+      if (filteredUpdates.roles) {
+        const validRoles = ["root", "admin", "ops", "driver"];
+        const newRoles = Array.isArray(filteredUpdates.roles)
+          ? filteredUpdates.roles
+          : [];
 
-        // Intentar actualización con permisos explícitos
-        console.log("[AUTH] Trying update with explicit permissions...");
+        if (!newRoles.every((role) => validRoles.includes(role))) {
+          throw new Error("Invalid roles provided");
+        }
 
-        const explicitPermissions = response.documents[0].$permissions;
-
-        const updatedProfile = await db.updateDocument(
-          env.DB_ID,
-          env.COLLECTION_USERS_PROFILE_ID,
-          profileId,
-          filteredUpdates,
-          explicitPermissions
-        );
-
-        console.log(
-          "[AUTH] Profile updated with explicit permissions:",
-          updatedProfile
-        );
-        return updatedProfile;
+        // Solo root puede asignar rol root
+        if (newRoles.includes("root") && !isRoot) {
+          throw new Error("Insufficient permissions to assign root role");
+        }
       }
+
+      // Actualizar el documento
+      const updatedProfile = await db.updateDocument({
+        databaseId: env.DB_ID,
+        collectionId: env.COLLECTION_USERS_PROFILE_ID,
+        documentId: currentProfile.$id,
+        data: filteredUpdates,
+      });
+
+      console.log("[AUTH] Profile updated successfully");
+      return updatedProfile;
     } catch (error) {
       console.error("[AUTH] Error updating profile:", error);
-      throw new Error(`Error updating profile: ${error.message}`);
+      throw error;
     }
   },
 
-  // Obtener rol del usuario basado en teams
+  // Obtener rol del usuario basado en el campo roles del perfil
   async getUserRole() {
     try {
-      const userTeams = await authService.getUserTeams();
-
-      // Verificar si es admin
-      if (userTeams.some((team) => team.$id === env.TEAM_ADMINS_ID)) {
-        return "admin";
+      const profile = await authService.getUserProfile();
+      if (!profile || !profile.roles || !Array.isArray(profile.roles)) {
+        return "anonymous";
       }
 
-      // Verificar si es driver
-      if (userTeams.some((team) => team.$id === env.TEAM_DRIVERS_ID)) {
-        return "driver";
-      }
+      const roles = profile.roles;
 
-      return "user";
+      // Determinar rol principal por prioridad
+      if (roles.includes("root")) return "root";
+      if (roles.includes("admin")) return "admin";
+      if (roles.includes("ops")) return "ops";
+      if (roles.includes("driver")) return "driver";
+
+      return "anonymous";
     } catch (error) {
       console.error("[AUTH] Error getting user role:", error);
-      return "user";
+      return "anonymous";
     }
   },
 };
 
 // ==========================================
-// FUNCIONES DE COMPATIBILIDAD (mantener por ahora)
+// FUNCIONES ADMINISTRATIVAS (sin teams)
 // ==========================================
 
-// ==========================================
-// ADMIN FUNCTIONS
-// ==========================================
-
-// Listar todos los usuarios (solo para administradores)
+// Listar todos los usuarios (basado en roles)
 export const listAllUsers = async () => {
   try {
-    // Verificar que el usuario actual es admin
-    const userTeams = await authService.getUserTeams();
-    const isUserAdmin = userTeams.some(
-      (team) => team.$id === env.TEAM_ADMINS_ID
-    );
+    // Verificar permisos del usuario actual
+    const currentUserProfile = await authService.getUserProfile();
+    if (!currentUserProfile) {
+      throw new Error("User profile not found");
+    }
 
-    if (!isUserAdmin) {
-      throw new Error("Access denied. Admin privileges required.");
+    const userRoles = currentUserProfile.roles || [];
+    const canViewAllUsers =
+      userRoles.includes("root") ||
+      userRoles.includes("admin") ||
+      userRoles.includes("ops");
+
+    if (!canViewAllUsers) {
+      throw new Error("Access denied. Insufficient privileges.");
     }
 
     // Obtener todos los perfiles de usuario
-    const response = await db.listDocuments(
-      env.DB_ID,
-      env.COLLECTION_USERS_PROFILE_ID,
-      [Query.orderDesc("$createdAt"), Query.limit(100)]
-    );
+    const response = await db.listDocuments({
+      databaseId: env.DB_ID,
+      collectionId: env.COLLECTION_USERS_PROFILE_ID,
+      queries: [Query.orderDesc("$createdAt"), Query.limit(100)],
+    });
 
     console.log("[AUTH] All users fetched:", response.documents.length);
     return response.documents.map((profile) => ({
       ...profile,
       name: profile.displayName,
-      role: profile.isDriver ? "driver" : "user", // Simplificado por ahora
+      role: profile.roles?.[0] || "unknown", // Usar el primer rol como principal
     }));
   } catch (error) {
     console.error("[AUTH] Error listing all users:", error);
@@ -473,24 +397,24 @@ export const listAllUsers = async () => {
   }
 };
 
-// Actualizar usuario de Appwrite (name, email, phone) - solo para administradores
+// Actualizar usuario de Appwrite (basado en roles)
 export const updateUserInAppwrite = async (userId, updates) => {
   try {
-    // Verificar que el usuario actual es admin
-    const userTeams = await authService.getUserTeams();
-    const isUserAdmin = userTeams.some(
-      (team) => team.$id === env.TEAM_ADMINS_ID
-    );
+    // Verificar permisos del usuario actual
+    const currentUserProfile = await authService.getUserProfile();
+    if (!currentUserProfile) {
+      throw new Error("User profile not found");
+    }
+
+    const userRoles = currentUserProfile.roles || [];
+    const isUserAdmin =
+      userRoles.includes("root") || userRoles.includes("admin");
 
     if (!isUserAdmin) {
       throw new Error("Access denied. Admin privileges required.");
     }
 
     console.log("[AUTH] Admin updating user:", userId, updates);
-
-    // Nota: Appwrite no permite actualizar usuarios de otros desde el SDK del cliente
-    // Por limitaciones de seguridad, solo podemos actualizar el perfil
-    // La actualización del usuario de Appwrite (email, phone) requiere servidor
 
     // Si se actualiza el name, sincronizar con displayName en el perfil
     if (updates.name) {
@@ -516,60 +440,63 @@ export const updateUserInAppwrite = async (userId, updates) => {
     console.error("[AUTH] Error updating user:", error);
     throw new Error(`Error updating user: ${error.message}`);
   }
-}; // Actualizar perfil de usuario como administrador
+};
+
+// Actualizar perfil de usuario como administrador (basado en roles)
 export const updateUserProfileAsAdmin = async (userId, updates) => {
   try {
-    // Verificar que el usuario actual es admin
-    const userTeams = await authService.getUserTeams();
-    const isUserAdmin = userTeams.some(
-      (team) => team.$id === env.TEAM_ADMINS_ID
-    );
+    // Verificar permisos del usuario actual
+    const currentUserProfile = await authService.getUserProfile();
+    if (!currentUserProfile) {
+      throw new Error("User profile not found");
+    }
+
+    const userRoles = currentUserProfile.roles || [];
+    const isUserAdmin =
+      userRoles.includes("root") || userRoles.includes("admin");
 
     if (!isUserAdmin) {
       throw new Error("Access denied. Admin privileges required.");
     }
 
-    console.log("[AUTH] Admin updating user profile:", userId, updates);
-
-    // Buscar el perfil del usuario target
-    const response = await db.listDocuments(
-      env.DB_ID,
-      env.COLLECTION_USERS_PROFILE_ID,
-      [Query.equal("userId", userId), Query.limit(1)]
-    );
+    // Buscar el perfil del usuario objetivo
+    const response = await db.listDocuments({
+      databaseId: env.DB_ID,
+      collectionId: env.COLLECTION_USERS_PROFILE_ID,
+      queries: [Query.equal("userId", userId), Query.limit(1)],
+    });
 
     if (response.documents.length === 0) {
-      throw new Error("User profile not found");
+      throw new Error("Target user profile not found");
     }
 
-    const profileId = response.documents[0].$id;
+    const targetProfile = response.documents[0];
 
-    // Actualizar el documento del perfil
-    const updatedProfile = await db.updateDocument(
-      env.DB_ID,
-      env.COLLECTION_USERS_PROFILE_ID,
-      profileId,
-      updates
-    );
+    // Validar que no se intente dar más permisos de los que tiene el admin actual
+    if (updates.roles) {
+      const isRoot = userRoles.includes("root");
+      const newRoles = Array.isArray(updates.roles) ? updates.roles : [];
 
-    console.log("[AUTH] User profile updated by admin:", updatedProfile);
+      // Solo root puede asignar rol root
+      if (newRoles.includes("root") && !isRoot) {
+        throw new Error("Insufficient permissions to assign root role");
+      }
+    }
+
+    // Actualizar el documento
+    const updatedProfile = await db.updateDocument({
+      databaseId: env.DB_ID,
+      collectionId: env.COLLECTION_USERS_PROFILE_ID,
+      documentId: targetProfile.$id,
+      data: updates,
+    });
+
+    console.log("[AUTH] Profile updated as admin");
     return updatedProfile;
   } catch (error) {
-    console.error("[AUTH] Error updating user profile as admin:", error);
-    throw new Error(`Error updating user profile: ${error.message}`);
+    console.error("[AUTH] Error updating profile as admin:", error);
+    throw new Error(`Error updating profile: ${error.message}`);
   }
 };
 
-// ==========================================
-// FUNCIONES DE COMPATIBILIDAD (mantener por ahora)
-// ==========================================
-
-// Alias para compatibilidad con código existente
-export const loginWithEmail = authService.login;
-export const registerUser = authService.register;
-export const logout = authService.logout;
-export const getCurrentSession = authService.checkSession;
-export const getUserProfile = authService.getUserProfile;
-export const bootstrapUserProfile = authService.bootstrapUserProfile;
-export const updateUser = authService.updateUser;
-export const updateUserProfile = authService.updateProfile;
+export default authService;
