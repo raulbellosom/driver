@@ -616,7 +616,7 @@ export default function UsersManagement() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-wrap gap-1">
-                        {user.teams.map((team) => (
+                        {(user.teams || []).map((team) => (
                           <span
                             key={team.id}
                             className="inline-flex px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full dark:bg-gray-700 dark:text-gray-200"
@@ -624,6 +624,11 @@ export default function UsersManagement() {
                             {team.name}
                           </span>
                         ))}
+                        {(!user.teams || user.teams.length === 0) && (
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            Sin equipos asignados
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
