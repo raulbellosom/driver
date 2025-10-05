@@ -19,6 +19,10 @@ import UsersManagement from "./pages/UsersManagement";
 // Driver Pages
 import DriverDashboard from "./pages/driver/Dashboard";
 
+// Fleet Management Pages
+import FleetManagement from "./components/fleet/FleetManagement";
+import VehicleForm from "./pages/shared/VehicleForm";
+
 // Auth Components
 import Protected from "./components/Protected";
 import PublicOnly from "./components/PublicOnly";
@@ -118,6 +122,35 @@ export default function App() {
           element={
             <Protected allow={["admin", "ops"]}>
               <UsersManagement />
+            </Protected>
+          }
+        />
+
+        {/* Fleet Management - Admin y Ops */}
+        <Route
+          path="fleet"
+          element={
+            <Protected allow={["admin", "ops"]}>
+              <FleetManagement />
+            </Protected>
+          }
+        />
+
+        {/* Vehicle Form - Admin y Ops */}
+        <Route
+          path="fleet/vehicles/new"
+          element={
+            <Protected allow={["admin", "ops"]}>
+              <VehicleForm />
+            </Protected>
+          }
+        />
+
+        <Route
+          path="fleet/vehicles/edit/:vehicleId"
+          element={
+            <Protected allow={["admin", "ops"]}>
+              <VehicleForm />
             </Protected>
           }
         />

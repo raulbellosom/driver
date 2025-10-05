@@ -25,7 +25,7 @@ const Modal = ({
     <Transition appear show={isOpen} as={Fragment}>
       <Dialog
         as="div"
-        className="relative z-50"
+        className="relative z-[9999]"
         onClose={closable ? onClose : () => {}}
       >
         <Transition.Child
@@ -37,7 +37,7 @@ const Modal = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/25 backdrop-blur-sm" />
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -79,7 +79,7 @@ const Modal = ({
                 )}
 
                 {/* Content */}
-                <div className="px-6 py-4">{children}</div>
+                <div>{children}</div>
 
                 {/* Footer */}
                 {footer && (

@@ -14,6 +14,8 @@ import {
   ChevronLeft,
   LogOut,
   Settings,
+  Truck,
+  CreditCard,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../../utils";
@@ -35,7 +37,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
           items: [
             { name: "Dashboard", href: "/admin", icon: Home },
             { name: "Usuarios", href: "/admin/users", icon: Users },
-            { name: "Vehículos", href: "/admin/vehicles", icon: Car },
+            { name: "Gestión de Flota", href: "/fleet", icon: Truck },
             { name: "Viajes", href: "/admin/trips", icon: MapPin },
             { name: "Reportes", href: "/admin/reports", icon: BarChart3 },
           ],
@@ -50,6 +52,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, onToggleCollapse }) => {
           items: [
             { name: "Dashboard", href: "/admin", icon: Home },
             { name: "Usuarios", href: "/admin/users", icon: Users },
+            { name: "Gestión de Flota", href: "/fleet", icon: Truck },
             { name: "Viajes", href: "/admin/trips", icon: MapPin },
             { name: "Reportes", href: "/admin/reports", icon: BarChart3 },
           ],

@@ -92,7 +92,7 @@ export async function fetchVehicleBrands() {
   try {
     const response = await db.listDocuments({
       databaseId: env.DB_ID,
-      collectionId: env.COLLECTION_BRANDS_ID || "vehicle_brands",
+      collectionId: env.COLLECTION_VEHICLE_BRANDS_ID,
       queries: [],
     });
     return response.documents;
@@ -105,13 +105,11 @@ export async function createVehicleBrand(data) {
   try {
     const response = await db.createDocument({
       databaseId: env.DB_ID,
-      collectionId: env.COLLECTION_BRANDS_ID || "vehicle_brands",
+      collectionId: env.COLLECTION_VEHICLE_BRANDS_ID,
       documentId: "unique()",
       data: {
         ...data,
         enabled: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       },
     });
     return response;
@@ -130,7 +128,7 @@ export async function fetchVehicleModels(brandId = null) {
 
     const response = await db.listDocuments({
       databaseId: env.DB_ID,
-      collectionId: env.COLLECTION_MODELS_ID || "vehicle_models",
+      collectionId: env.COLLECTION_VEHICLE_MODELS_ID,
       queries: queries,
     });
     return response.documents;
@@ -143,7 +141,7 @@ export async function createVehicleModel(data) {
   try {
     const response = await db.createDocument({
       databaseId: env.DB_ID,
-      collectionId: env.COLLECTION_MODELS_ID || "vehicle_models",
+      collectionId: env.COLLECTION_VEHICLE_MODELS_ID,
       documentId: "unique()",
       data: {
         ...data,
